@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import logo from "../assets/logo.png";
 import { useDispatch } from "react-redux";
 import { logout } from "../redux/slices/authSlice";
+import { RiMedicineBottleFill } from "react-icons/ri";
 
 import {
   RiDashboardFill,
@@ -67,13 +68,22 @@ const Sidebar = ({ onToggle }) => {
     { to: "/templates", icon: RiFileList3Fill, label: "Template Management" },
     { to: "/analytics", icon: RiBarChartBoxFill, label: "Analytics & Reports" },
     { to: "/feedback", icon: RiFeedbackFill, label: "Feedback & Support" },
-    { to: "/messaging", icon: RiNotification3Fill, label: "Messaging & Notifications" },
+    {
+      to: "/messaging",
+      icon: RiNotification3Fill,
+      label: "Messaging & Notifications",
+    },
     { to: "/rewards", icon: RiAwardFill, label: "Contribution & Rewards" },
     { to: "/doccertificates", icon: RiFileShield2Fill, label: "Certificates" },
     {
       to: "/tathastu-sessions",
       icon: RiChat1Fill,
       label: "Chat Messaging",
+    },
+    {
+      to: "/drug-library",
+      icon: RiMedicineBottleFill,
+      label: "Drug Library",
     },
   ];
 
@@ -92,6 +102,7 @@ const Sidebar = ({ onToggle }) => {
       flexDirection: "column",
       zIndex: 2000,
       boxShadow: "2px 0 12px rgba(0,0,0,0.15)",
+      overflow: "hidden", // ✅ ADD THIS
     },
 
     overlay: {
@@ -162,6 +173,8 @@ const Sidebar = ({ onToggle }) => {
       alignItems: "stretch",
       width: "100%",
       gap: "4px",
+      overflowY: "auto", // ✅ ADD
+      scrollbarWidth: "none", // Firefox
     },
 
     navLink: {
@@ -229,7 +242,11 @@ const Sidebar = ({ onToggle }) => {
 
       <aside style={styles.sidebar}>
         <button style={styles.toggleBtn} onClick={toggleSidebar}>
-          {isOpen ? <IoChevronBack size={20} /> : <IoChevronForward size={20} />}
+          {isOpen ? (
+            <IoChevronBack size={20} />
+          ) : (
+            <IoChevronForward size={20} />
+          )}
         </button>
 
         <div style={styles.logoContainer}>
@@ -242,7 +259,7 @@ const Sidebar = ({ onToggle }) => {
         <nav style={styles.nav}>
           {navLinks.map((item) => {
             const isActive = location.pathname === item.to;
-            
+
             return (
               <Link
                 key={item.to}
@@ -281,8 +298,8 @@ const Sidebar = ({ onToggle }) => {
         </nav>
 
         <div style={styles.logoutWrapper}>
-          <button 
-            style={styles.logoutBtn} 
+          <button
+            style={styles.logoutBtn}
             onClick={handleLogout}
             onMouseEnter={(e) => {
               e.currentTarget.style.background = "#b91c1c";
