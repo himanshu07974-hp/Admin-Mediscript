@@ -44,6 +44,112 @@ import {
   Film,
   GitBranch,
 } from "lucide-react";
+import { addSectionsToChapter } from "../redux/slices/systemsSlice";
+
+import { useRef } from "react";
+import { Moon, Sun } from "lucide-react";
+import { useTheme } from "../theme/ThemeContext";
+
+// ================== STATIC MOCK DATA ==================
+const USE_STATIC_DATA = true;
+
+const SYSTEM_NAME_OPTIONS = [
+  "Cardiovascular System",
+  "Respiratory System",
+  "Gastrointestinal System",
+  "Neurology",
+  "Endocrinology",
+  "Nephrology",
+  "Musculoskeletal System",
+  "Dermatology",
+  "Pediatrics",
+  "Obstetrics & Gynecology",
+  "Psychiatry",
+];
+
+const PREDEFINED_CHAPTERS = [
+  { code: "C", title: "Chapter 1 (Overview)" },
+  { code: "A", title: "Anatomy & Physiology" },
+  { code: "P", title: "Pathophysiology" },
+  { code: "D", title: "Drug Treatment" },
+  { code: "E", title: "Emergency Management" },
+];
+
+const STATIC_SYSTEMS = [
+  {
+    _id: "sys1",
+    title: "Cardiovascular System",
+    description: "Heart and blood vessel related studies",
+    image: null,
+    chapters: [
+      {
+        _id: "chap1",
+        title: "Anatomy & Physiology of the Heart",
+        sections: [
+          {
+            _id: "sec1",
+            title: "Introduction",
+            content:
+              "The cardiovascular system consists of the heart, blood, and blood vessels. It plays a vital role in transporting oxygen and nutrients.",
+            images: [],
+            videos: [],
+            flowcharts: [],
+            pdfs: [],
+          },
+          {
+            _id: "sec2",
+            title: "Investigations",
+            content:
+              "Initial investigations include CBC, ECG, chest X-ray, lipid profile and echocardiography as required.",
+            images: [],
+            videos: [],
+            flowcharts: [],
+            pdfs: [],
+          },
+          {
+            _id: "sec3",
+            title: "Practice Cases",
+            content: `
+Case 1:
+A 55-year-old male presents with chest pain and sweating.
+
+Vitals:
+BP: 150/90 mmHg
+HR: 98 bpm
+
+Think about diagnosis and investigations.
+
+Case 2:
+ECG shows ST elevation in leads II, III, aVF.
+
+What is the diagnosis?
+`,
+            images: [],
+            videos: [],
+            flowcharts: [],
+            pdfs: [],
+          },
+        ],
+      },
+    ],
+  },
+];
+
+const lightTheme = {
+  bg: "#f8fafc",
+  surface: "#ffffff",
+  text: "#1e293b",
+  mutedText: "#64748b",
+  border: "#e2e8f0",
+};
+
+const darkTheme = {
+  bg: "#020617",
+  surface: "#020617",
+  text: "#e5e7eb",
+  mutedText: "#94a3b8",
+  border: "#1e293b",
+};
 
 /* -------------------------------------------------------------------------- */
 /*                                 STYLES                                     */
@@ -378,13 +484,41 @@ const ReadMode = () => {
     pdfs: [],
   });
 
+  const [systemNameMode, setSystemNameMode] = useState("select");
+
+  const sectionRefs = useRef({});
+
+  const systemsData = USE_STATIC_DATA
+    ? {
+        allIds: STATIC_SYSTEMS.map((s) => s._id),
+        byId: STATIC_SYSTEMS.reduce((acc, s) => {
+          acc[s._id] = s;
+          return acc;
+        }, {}),
+      }
+    : { allIds, byId };
+
   const [finalSystemId, setFinalSystemId] = useState("");
   const [finalChapterId, setFinalChapterId] = useState("");
+
+  const { theme, toggleTheme } = useTheme();
+  const activeTheme = theme === "dark" ? darkTheme : lightTheme;
 
   useEffect(() => {
     dispatch(fetchSystems());
     dispatch(fetchPredefinedSections());
   }, [dispatch]);
+
+  useEffect(() => {
+    if (error) {
+      toastError(error);
+      dispatch(clearError());
+    }
+    if (predefinedError) {
+      toastError(predefinedError);
+      dispatch(clearError());
+    }
+  }, [error, predefinedError, toastError, dispatch]);
 
   const resetForm = () => {
     setStep(1);
@@ -407,48 +541,25 @@ const ReadMode = () => {
   /* ==================== NAVIGATION ==================== */
   const handleSystemClick = (sysId) => {
     dispatch(selectSystem(sysId));
-    dispatch(fetchChaptersBySystem(sysId));
-  };
-
-  const handleChapterClick = (chapId) => {
-    dispatch(selectChapter(chapId));
-    dispatch(fetchSectionsByChapter(chapId));
+    dispatch(selectChapter(null));
     dispatch(setActiveSection(null));
     dispatch(setActiveSectionData(null));
   };
 
-  const handleSectionClick = async (sectionId) => {
-    let correctChapterId = null;
-    let localSection = null;
+  const handleChapterClick = (chapId) => {
+    dispatch(selectChapter(chapId));
+    dispatch(setActiveSection(null));
+    dispatch(setActiveSectionData(null));
+  };
 
-    for (const sys of Object.values(byId)) {
-      for (const chap of sys.chapters || []) {
-        const sec = chap.sections?.find((s) => s._id === sectionId);
-        if (sec) {
-          correctChapterId = chap._id;
-          localSection = sec;
-          break;
-        }
-      }
-      if (correctChapterId) break;
-    }
+  const handleSectionClick = (sectionId) => {
+    const chapter = currentSystem.chapters.find(
+      (c) => c._id === selected.chapterId
+    );
+    const section = chapter.sections.find((s) => s._id === sectionId);
 
-    if (!correctChapterId) return;
-
-    dispatch(setActiveSection(localSection.title));
-    dispatch(setActiveSectionData(localSection));
-
-    try {
-      const result = await dispatch(
-        fetchSectionById({
-          chapterId: correctChapterId,
-          sectionId,
-        })
-      ).unwrap();
-      dispatch(setActiveSectionData(result.section));
-    } catch (err) {
-      console.warn("Using local cache");
-    }
+    dispatch(setActiveSection(section.title));
+    dispatch(setActiveSectionData(section));
   };
 
   const handleBackToSystems = () => dispatch(clearSelection());
@@ -542,34 +653,61 @@ const ReadMode = () => {
             ? await dispatch(
                 updateSystem({
                   id: editId,
-                  title: newSystemTitle,
+                  title:
+                    systemNameMode === "other"
+                      ? newSystemTitle
+                      : systemNameMode,
                   description: newSystemDesc,
                   image: systemImage,
                 })
               ).unwrap()
             : await dispatch(
                 createSystem({
-                  title: newSystemTitle,
+                  title:
+                    systemNameMode === "other"
+                      ? newSystemTitle
+                      : systemNameMode,
                   description: newSystemDesc,
                   image: systemImage,
                 })
               ).unwrap();
         sysId = res._id;
+        success(
+          editMode === "system"
+            ? "System updated successfully"
+            : "System created successfully"
+        );
       }
       setFinalSystemId(sysId);
 
       let chapId = selectedChapterId;
-      if (!chapId && newChapterTitle.trim()) {
-        const res =
-          editMode === "chapter" && editId
-            ? await dispatch(
-                updateChapter({ chapterId: editId, title: newChapterTitle })
-              ).unwrap()
-            : await dispatch(
-                createChapter({ systemId: sysId, title: newChapterTitle })
-              ).unwrap();
+
+      if (selectedChapterId) {
+        const chapterTemplate = PREDEFINED_CHAPTERS.find(
+          (c) => c.title === selectedChapterId
+        );
+
+        if (!chapterTemplate) {
+          toastError("Invalid chapter selected");
+          return;
+        }
+
+        const res = await dispatch(
+          createChapter({
+            systemId: sysId,
+            title: chapterTemplate.title,
+            code: chapterTemplate.code, // 👈 LOCKING KEY
+            order: PREDEFINED_CHAPTERS.findIndex(
+              (c) => c.code === chapterTemplate.code
+            ),
+          })
+        ).unwrap();
+
         chapId = res._id || res.chapter?._id;
+
+        success("Chapter created successfully");
       }
+
       setFinalChapterId(chapId);
 
       if (editMode === "system" || editMode === "chapter") {
@@ -659,24 +797,44 @@ const ReadMode = () => {
     resetForm();
   };
 
+  const scrollToSection = (title) => {
+    sectionRefs.current[title]?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
+
   const currentSectionTitle = predefinedSections[currentSectionIndex];
 
   /* ==================== CURRENT DATA ==================== */
-  const currentSystem = byId[selected.systemId];
+  const currentSystem = systemsData.byId[selected.systemId];
+
   const currentChapter = selected.chapterId
     ? currentSystem?.chapters?.find((ch) => ch._id === selected.chapterId)
     : null;
 
   const filledSections =
-    currentChapter?.sections?.filter((sec) => {
-      const hasText = sec.content?.trim();
-      const hasMedia =
-        sec.images?.length > 0 ||
-        sec.videos?.length > 0 ||
-        sec.flowcharts?.length > 0 ||
-        sec.pdfs?.length > 0;
-      return hasText || hasMedia;
-    }) || [];
+    predefinedSections
+      ?.map((title, index) => {
+        const sec = currentChapter?.sections?.find((s) => s.title === title);
+
+        if (!sec) return null;
+
+        const hasText = sec.content?.trim();
+        const hasMedia =
+          sec.images?.length > 0 ||
+          sec.videos?.length > 0 ||
+          sec.flowcharts?.length > 0 ||
+          sec.pdfs?.length > 0;
+
+        if (!hasText && !hasMedia) return null;
+
+        return {
+          ...sec,
+          order: index + 1, // 🔥 LOCKED ORDER NUMBER
+        };
+      })
+      .filter(Boolean) || [];
 
   /* ==================== RENDER MEDIA ==================== */
   const renderMedia = (mediaArray = [], icon, label, type) => {
@@ -816,8 +974,8 @@ const ReadMode = () => {
             )}
 
             <div style={styles.grid}>
-              {allIds.map((id) => {
-                const sys = byId[id];
+              {systemsData.allIds.map((id) => {
+                const sys = systemsData.byId[id];
                 const hasImage = !!sys.image;
 
                 return (
@@ -856,9 +1014,9 @@ const ReadMode = () => {
                     </div>
 
                     <h3 style={styles.cardTitle}>{sys.title}</h3>
+
                     <p style={styles.cardSubtitle}>
-                      <Hash style={{ width: "1rem", height: "1rem" }} />
-                      {sys.chapters?.length || 0} chapter
+                      {sys.chapters?.length || 0} Chapter
                       {(sys.chapters?.length || 0) !== 1 ? "s" : ""}
                     </p>
 
@@ -930,65 +1088,78 @@ const ReadMode = () => {
               {currentSystem?.title}
             </h1>
             <div style={styles.grid}>
-              {currentSystem?.chapters?.map((chap) => (
-                <div
-                  key={chap._id}
-                  style={styles.card}
-                  onClick={() => handleChapterClick(chap._id)}
-                  onMouseEnter={(e) =>
-                    e.currentTarget.classList.add("card-hover")
-                  }
-                  onMouseLeave={(e) =>
-                    e.currentTarget.classList.remove("card-hover")
-                  }
-                >
-                  <div style={styles.iconBox}>
-                    <FileText
-                      style={{ width: "2rem", height: "2rem", color: "white" }}
-                    />
-                  </div>
-                  <h3 style={styles.cardTitle}>{chap.title}</h3>
-                  <p style={styles.cardSubtitle}>
-                    <Hash style={{ width: "1rem", height: "1rem" }} />
-                    {chap.sections?.length || 0} section
-                    {(chap.sections?.length || 0) !== 1 ? "s" : ""}
-                  </p>
+              {currentSystem?.chapters
+                ?.slice()
+                .sort(
+                  (a, b) =>
+                    PREDEFINED_CHAPTERS.findIndex((c) => c.code === a.code) -
+                    PREDEFINED_CHAPTERS.findIndex((c) => c.code === b.code)
+                )
+                .map((chap) => (
                   <div
-                    style={{
-                      position: "absolute",
-                      top: "0.75rem",
-                      right: "0.75rem",
-                      display: "flex",
-                      gap: "0.5rem",
-                    }}
+                    key={chap._id}
+                    style={styles.card}
+                    onClick={() => handleChapterClick(chap._id)}
+                    onMouseEnter={(e) =>
+                      e.currentTarget.classList.add("card-hover")
+                    }
+                    onMouseLeave={(e) =>
+                      e.currentTarget.classList.remove("card-hover")
+                    }
                   >
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleEdit("chapter", chap._id, {
-                          systemId: selected.systemId,
-                        });
+                    <div style={styles.iconBox}>
+                      <FileText
+                        style={{
+                          width: "2rem",
+                          height: "2rem",
+                          color: "white",
+                        }}
+                      />
+                    </div>
+                    <h3 style={styles.cardTitle}>
+                      [{chap.code}] {chap.title}
+                    </h3>
+                    <p style={styles.cardSubtitle}>
+                      <Hash style={{ width: "1rem", height: "1rem" }} />
+                      {chap.sections?.length || 0} section
+                      {(chap.sections?.length || 0) !== 1 ? "s" : ""}
+                    </p>
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "0.75rem",
+                        right: "0.75rem",
+                        display: "flex",
+                        gap: "0.5rem",
                       }}
-                      style={styles.actionBtn}
-                      title="Edit"
                     >
-                      <Edit2 size={16} color="#64748b" />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete("chapter", chap._id, {
-                          systemId: selected.systemId,
-                        });
-                      }}
-                      style={styles.actionBtn}
-                      title="Delete"
-                    >
-                      <Trash2 size={16} color="#dc2626" />
-                    </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEdit("chapter", chap._id, {
+                            systemId: selected.systemId,
+                          });
+                        }}
+                        style={styles.actionBtn}
+                        title="Edit"
+                      >
+                        <Edit2 size={16} color="#64748b" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete("chapter", chap._id, {
+                            systemId: selected.systemId,
+                          });
+                        }}
+                        style={styles.actionBtn}
+                        title="Delete"
+                      >
+                        <Trash2 size={16} color="#dc2626" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
             </div>
           </div>
         )}
@@ -1012,72 +1183,89 @@ const ReadMode = () => {
               </h3>
               <div style={{ marginTop: "1rem" }}>
                 {filledSections.length > 0 ? (
-                  filledSections.map((sec) => (
-                    <div
-                      key={sec._id}
-                      style={
-                        activeSection === sec.title
-                          ? {
-                              ...styles.sectionItem,
-                              ...styles.sectionItemActive,
-                            }
-                          : styles.sectionItem
-                      }
-                      onClick={() => handleSectionClick(sec._id)}
-                    >
+                  [...filledSections]
+                    .sort(
+                      (a, b) =>
+                        predefinedSections.indexOf(a.title) -
+                        predefinedSections.indexOf(b.title)
+                    )
+                    .map((sec) => (
                       <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "0.5rem",
-                          flex: 1,
-                        }}
+                        key={sec._id}
+                        style={
+                          activeSection === sec.title
+                            ? {
+                                ...styles.sectionItem,
+                                ...styles.sectionItemActive,
+                              }
+                            : styles.sectionItem
+                        }
+                        onClick={() => handleSectionClick(sec._id)}
                       >
-                        <ChevronRight
+                        <div
                           style={{
-                            width: "1rem",
-                            height: "1rem",
-                            opacity: activeSection === sec.title ? 1 : 0.6,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.5rem",
+                            flex: 1,
                           }}
-                        />
-                        {sec.title}
-                      </div>
-                      <div style={{ display: "flex", gap: "0.25rem" }}>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEdit("section", sec._id, {
-                              chapterId: selected.chapterId,
-                            });
-                          }}
-                          style={styles.actionBtn}
-                          title="Edit"
                         >
-                          <Edit2
-                            size={14}
-                            color={
-                              activeSection === sec.title ? "white" : "#64748b"
-                            }
+                          <span style={{ fontWeight: 700, opacity: 0.7 }}>
+                            {sec.order}.
+                          </span>
+
+                          <ChevronRight
+                            style={{
+                              width: "1rem",
+                              height: "1rem",
+                              opacity: activeSection === sec.title ? 1 : 0.6,
+                            }}
                           />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete("section", sec._id);
-                          }}
-                          style={styles.actionBtn}
-                          title="Delete"
-                        >
-                          <Trash2
-                            size={14}
-                            color={
-                              activeSection === sec.title ? "white" : "#dc2626"
-                            }
-                          />
-                        </button>
+
+                          {sec.title}
+                        </div>
+
+                        <div style={{ display: "flex", gap: "0.25rem" }}>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEdit("section", sec._id, {
+                                chapterId: selected.chapterId,
+                              });
+                            }}
+                            style={styles.actionBtn}
+                            title="Edit"
+                          >
+                            <Edit2
+                              size={14}
+                              color={
+                                activeSection === sec.title
+                                  ? "white"
+                                  : "#64748b"
+                              }
+                            />
+                          </button>
+
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete("section", sec._id);
+                            }}
+                            style={styles.actionBtn}
+                            title="Delete"
+                          >
+                            <Trash2
+                              size={14}
+                              color={
+                                activeSection === sec.title
+                                  ? "white"
+                                  : "#dc2626"
+                              }
+                            />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))
+                    ))
                 ) : (
                   <p
                     style={{
@@ -1094,66 +1282,85 @@ const ReadMode = () => {
             </div>
 
             <div style={styles.contentArea}>
-              {activeSection ? (
-                <>
+              {/* 🔝 TOP SECTION NAVIGATION */}
+              <div
+                style={{
+                  position: "sticky",
+                  top: 0,
+                  background: "#ffffff",
+                  zIndex: 10,
+                  paddingBottom: "1rem",
+                  marginBottom: "2rem",
+                  borderBottom: "1px solid #e2e8f0",
+                  display: "flex",
+                  gap: "0.75rem",
+                  flexWrap: "wrap",
+                }}
+              >
+                {filledSections.map((sec) => (
+                  <button
+                    key={sec._id}
+                    onClick={() => scrollToSection(sec.title)}
+                    style={{
+                      padding: "0.4rem 0.75rem",
+                      borderRadius: "9999px",
+                      border: "1px solid #0d9488",
+                      background:
+                        activeSection === sec.title ? "#0d9488" : "#ffffff",
+                      color:
+                        activeSection === sec.title ? "#ffffff" : "#0d9488",
+                      fontSize: "0.85rem",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {sec.title}
+                  </button>
+                ))}
+              </div>
+
+              {/* 📘 TEXTBOOK STYLE CONTENT (ALL SECTIONS) */}
+              {filledSections.map((sec) => (
+                <div
+                  key={sec._id}
+                  ref={(el) => (sectionRefs.current[sec.title] = el)}
+                  style={{ marginBottom: "3rem" }}
+                  onMouseEnter={() => dispatch(setActiveSection(sec.title))}
+                >
                   <h2 style={styles.contentTitle}>
-                    <FileText style={{ width: "1.75rem", height: "1.75rem" }} />
-                    {activeSection}
+                    <FileText style={{ width: "1.5rem", height: "1.5rem" }} />
+                    {sec.title}
                   </h2>
-                  {activeSectionData?.content ? (
-                    <div style={styles.contentText}>
-                      {activeSectionData.content}
-                    </div>
+
+                  {sec.content ? (
+                    <div style={styles.contentText}>{sec.content}</div>
                   ) : (
                     <p style={{ color: "#94a3b8", fontStyle: "italic" }}>
-                      No text content.
+                      No content available.
                     </p>
                   )}
 
                   {renderMedia(
-                    activeSectionData?.images,
+                    sec.images,
                     <Image size={18} />,
                     "Images",
                     "image"
                   )}
                   {renderMedia(
-                    activeSectionData?.videos,
+                    sec.videos,
                     <Film size={18} />,
                     "Videos",
                     "video"
                   )}
                   {renderMedia(
-                    activeSectionData?.flowcharts,
+                    sec.flowcharts,
                     <GitBranch size={18} />,
                     "Flowcharts",
                     "flowchart"
                   )}
-                  {renderMedia(
-                    activeSectionData?.pdfs,
-                    <FileText style={{ color: "#dc2626" }} size={18} />,
-                    "PDFs",
-                    "pdf"
-                  )}
-                </>
-              ) : (
-                <div
-                  style={{
-                    textAlign: "center",
-                    color: "#94a3b8",
-                    marginTop: "3rem",
-                  }}
-                >
-                  <FileText
-                    style={{
-                      width: "3rem",
-                      height: "3rem",
-                      marginBottom: "1rem",
-                      opacity: 0.5,
-                    }}
-                  />
-                  <p>Select a section from the left to view its content.</p>
+                  {renderMedia(sec.pdfs, <FileText size={18} />, "PDFs", "pdf")}
                 </div>
-              )}
+              ))}
             </div>
           </div>
         )}
@@ -1218,7 +1425,7 @@ const ReadMode = () => {
                   : "Preview"}
               </h2>
 
-              {step === 1 && (
+              {/* {step === 1 && (
                 <>
                   <select
                     style={styles.select}
@@ -1234,12 +1441,32 @@ const ReadMode = () => {
                   </select>
                   {!selectedSystemId && (
                     <>
-                      <input
-                        placeholder="New System Title"
-                        value={newSystemTitle}
-                        onChange={(e) => setNewSystemTitle(e.target.value)}
-                        style={styles.input}
-                      />
+                      <select
+                        style={styles.select}
+                        value={
+                          systemNameMode === "select" ? newSystemTitle : "OTHER"
+                        }
+                        onChange={(e) => {
+                          if (e.target.value === "OTHER") {
+                            setSystemNameMode("other");
+                            setNewSystemTitle("");
+                          } else {
+                            setSystemNameMode("select");
+                            setNewSystemTitle(e.target.value);
+                          }
+                        }}
+                      >
+                        <option value="">Select System Name</option>
+
+                        {SYSTEM_NAME_OPTIONS.map((sys) => (
+                          <option key={sys} value={sys}>
+                            {sys}
+                          </option>
+                        ))}
+
+                        <option value="OTHER">Other</option>
+                      </select>
+
                       <textarea
                         placeholder="New System Description"
                         value={newSystemDesc}
@@ -1268,6 +1495,62 @@ const ReadMode = () => {
                     )}
                   </button>
                 </>
+              )} */}
+
+              {step === 1 && (
+                <>
+                  {/* SYSTEM NAME DROPDOWN */}
+                  <select
+                    style={styles.select}
+                    value={systemNameMode}
+                    onChange={(e) => {
+                      setSystemNameMode(e.target.value);
+                      setNewSystemTitle("");
+                    }}
+                  >
+                    <option value="select">Select Medical System</option>
+                    {SYSTEM_NAME_OPTIONS.map((sys) => (
+                      <option key={sys} value={sys}>
+                        {sys}
+                      </option>
+                    ))}
+                    <option value="other">Other</option>
+                  </select>
+
+                  {/* OTHER SYSTEM INPUT — 👈 YEHI AAPKA CODE HAI */}
+                  {systemNameMode === "other" && (
+                    <input
+                      placeholder="Enter custom system name"
+                      value={newSystemTitle}
+                      onChange={(e) => setNewSystemTitle(e.target.value)}
+                      style={styles.input}
+                    />
+                  )}
+
+                  {/* DESCRIPTION */}
+                  <textarea
+                    placeholder="System Description"
+                    value={newSystemDesc}
+                    onChange={(e) => setNewSystemDesc(e.target.value)}
+                    style={styles.textarea}
+                  />
+
+                  {/* IMAGE */}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setSystemImage(e.target.files[0])}
+                    style={{ ...styles.input, padding: "0.5rem" }}
+                  />
+
+                  <button
+                    onClick={handleNext}
+                    disabled={submitting}
+                    style={styles.submitBtn(submitting)}
+                  >
+                    Next
+                  </button>
+                </>
               )}
 
               {step === 2 && (
@@ -1279,21 +1562,20 @@ const ReadMode = () => {
                     disabled={!finalSystemId}
                   >
                     <option value="">Select Existing Chapter</option>
-                    {finalSystemId &&
-                      byId[finalSystemId]?.chapters?.map((ch) => (
-                        <option key={ch._id} value={ch._id}>
-                          {ch.title}
-                        </option>
-                      ))}
+                    {PREDEFINED_CHAPTERS.map((ch) => (
+                      <option key={ch.code} value={ch.title}>
+                        [{ch.code}] {ch.title}
+                      </option>
+                    ))}
                   </select>
-                  {!selectedChapterId && (
+                  {/* {!selectedChapterId && (
                     <input
                       placeholder="New Chapter Title"
                       value={newChapterTitle}
                       onChange={(e) => setNewChapterTitle(e.target.value)}
                       style={styles.input}
                     />
-                  )}
+                  )} */}
                   <button
                     onClick={handleNext}
                     disabled={submitting}

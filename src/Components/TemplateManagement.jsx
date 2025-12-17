@@ -129,23 +129,32 @@ const styles = {
   },
   table: {
     width: "100%",
-    borderCollapse: "collapse",
-    marginTop: "0.75rem",
-    minWidth: "600px",
+    borderCollapse: "separate",
+    borderSpacing: "0",
+    background: "#ffffff",
+    borderRadius: "14px",
+    overflow: "hidden",
+    boxShadow: "0 8px 24px rgba(0,0,0,0.06)",
+    fontSize: "0.9rem",
   },
   th: {
-    padding: "0.75rem",
-    border: "1px solid #e5e7eb",
+    padding: "14px 16px",
     textAlign: "left",
-    background: "#186476",
-    color: "white",
-    fontWeight: "600",
+    background: "#F8FAFC",
+    color: "#334155",
+    fontWeight: "700",
+    fontSize: "0.75rem",
+    letterSpacing: "0.08em",
+    textTransform: "uppercase",
+    borderBottom: "1px solid #E5E7EB",
+    whiteSpace: "nowrap",
   },
   td: {
-    padding: "0.75rem",
-    border: "1px solid #e5e7eb",
-    backgroundColor: "#FFFFFF",
-    color: "#1f2937",
+    padding: "14px 16px",
+    color: "#0F172A",
+    borderBottom: "1px solid #EEF2F7",
+    verticalAlign: "middle",
+    whiteSpace: "nowrap",
   },
   error: { color: "#dc2626", marginBottom: "0.5rem", fontWeight: "500" },
   buttonGroup: {
@@ -721,6 +730,9 @@ function TemplateManagement() {
   const [previewChapter, setPreviewChapter] = useState(null);
 
   const [openMenuId, setOpenMenuId] = useState(null);
+
+  const PAGE_SIZE = 10;
+  const [templatesPage, setTemplatesPage] = useState(1);
 
   // Load data
   useEffect(() => {
@@ -1323,6 +1335,16 @@ function TemplateManagement() {
     setEditingTemplate(null);
   };
 
+  const totalTemplatePages = Math.max(
+    1,
+    Math.ceil(templates.length / PAGE_SIZE)
+  );
+
+  const paginatedTemplates = useMemo(() => {
+    const start = (templatesPage - 1) * PAGE_SIZE;
+    return templates.slice(start, start + PAGE_SIZE);
+  }, [templates, templatesPage]);
+
   // ---------- READ-MODE NAVIGATION ----------
   const handleCardClick = (type, id) => {
     if (type === "system") dispatch(selectSystem(id));
@@ -1435,76 +1457,106 @@ function TemplateManagement() {
 
   // ---------- TABLE ROWS ----------
   const tableRows = useMemo(() => {
-    return templates.map((t, index) => (
-      <tr
-        key={t._id}
-        style={{ backgroundColor: index % 2 === 0 ? "#f9fafb" : "#ffffff" }}
-      >
-        <td style={styles.td}>{index + 1}</td>
+    return paginatedTemplates.map((t, index) => {
+      // ✅ global index across pages
+      const displayIndex = (templatesPage - 1) * PAGE_SIZE + index;
 
-        <td style={styles.td}>
-          {t._id || t.id ? (t._id || t.id).slice(-6) : "—"}
-        </td>
+      return (
+        <tr
+          key={t._id}
+          style={{
+            backgroundColor: displayIndex % 2 === 0 ? "#ffffff" : "#F9FAFB",
+            transition: "background 0.2s ease",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "#EEF2FF";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background =
+              displayIndex % 2 === 0 ? "#ffffff" : "#F9FAFB";
+          }}
+        >
+          {/* S.No */}
+          <td style={styles.td}>{displayIndex + 1}</td>
 
-        <td style={styles.td}>{t.system || "N/A"}</td>
-        <td style={styles.td}>{t.disease}</td>
+          {/* ID */}
+          <td style={styles.td}>
+            {t._id || t.id ? (t._id || t.id).slice(-6) : "—"}
+          </td>
 
-        <td style={styles.td}>
-          {t.updatedAt ? new Date(t.updatedAt).toLocaleDateString() : "—"}
-        </td>
+          {/* System */}
+          <td style={styles.td}>{t.system || "N/A"}</td>
 
-        <td style={{ ...styles.td, position: "relative" }}>
-          <button
-            onClick={() => setOpenMenuId(openMenuId === t._id ? null : t._id)}
-            style={{
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              padding: "0.4rem",
-              borderRadius: "50%",
-            }}
-            title="Actions"
-          >
-            <MoreVertical size={18} color="#475569" />
-          </button>
+          {/* Disease */}
+          <td style={styles.td}>{t.disease}</td>
 
-          {openMenuId === t._id && (
-            <div style={menuContainerStyle}>
-              <MenuItem
-                icon={<Eye size={16} />}
-                label="View"
-                onClick={() => {
-                  setOpenMenuId(null);
-                  openView(t._id);
-                }}
-              />
+          {/* Updated */}
+          <td style={styles.td}>
+            {t.updatedAt ? new Date(t.updatedAt).toLocaleDateString() : "—"}
+          </td>
 
-              <MenuItem
-                icon={<Pencil size={16} />}
-                label="Edit"
-                onClick={() => {
-                  setOpenMenuId(null);
-                  handleEditTemplate(t);
-                }}
-              />
+          {/* Actions */}
+          <td style={{ ...styles.td, position: "relative" }}>
+            <button
+              onClick={() => setOpenMenuId(openMenuId === t._id ? null : t._id)}
+              title="Actions"
+              style={{
+                background: "#F8FAFC",
+                border: "1px solid #E5E7EB",
+                borderRadius: "8px",
+                padding: "6px",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "#EEF2FF";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "#F8FAFC";
+              }}
+            >
+              <MoreVertical size={16} color="#475569" />
+            </button>
 
-              <div style={menuDividerStyle} />
-
-              <MenuItem
-                icon={<Trash2 size={16} />}
-                label="Delete"
-                danger
-                onClick={() => {
-                  setOpenMenuId(null);
-                  handleDeleteTemplate(t._id);
-                }}
-              />
-            </div>
-          )}
-        </td>
-      </tr>
-    ));
-  }, [templates, openMenuId]); // ✅ FIXED
+            {openMenuId === t._id && (
+              <div style={menuContainerStyle}>
+                <MenuItem
+                  icon={<Eye size={16} />}
+                  label="View"
+                  onClick={() => {
+                    setOpenMenuId(null);
+                    openView(t._id);
+                  }}
+                />
+                <MenuItem
+                  icon={<Pencil size={16} />}
+                  label="Edit"
+                  onClick={() => {
+                    setOpenMenuId(null);
+                    handleEditTemplate(t);
+                  }}
+                />
+                <div style={menuDividerStyle} />
+                <MenuItem
+                  icon={<Trash2 size={16} />}
+                  label="Delete"
+                  danger
+                  onClick={() => {
+                    setOpenMenuId(null);
+                    handleDeleteTemplate(t._id);
+                  }}
+                />
+              </div>
+            )}
+          </td>
+        </tr>
+      );
+    });
+  }, [paginatedTemplates, openMenuId, templatesPage]);
+  // ✅ FIXED
 
   return (
     <>
@@ -1679,7 +1731,7 @@ function TemplateManagement() {
             )}
 
             {!presLoading && !presError && templates.length > 0 && (
-              <div style={{ overflowX: "auto" }}>
+              <div style={{ overflowX: "auto", borderRadius: "14px" }}>
                 <table style={styles.table}>
                   <thead>
                     <tr>
@@ -1693,6 +1745,55 @@ function TemplateManagement() {
                   </thead>
                   <tbody>{tableRows}</tbody>
                 </table>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginTop: "1rem",
+                    fontSize: "0.9rem",
+                    color: "#334155",
+                  }}
+                >
+                  <button
+                    style={{
+                      ...styles.btnPrimary,
+                      background: templatesPage === 1 ? "#9CA3AF" : "#186476",
+                      cursor: templatesPage === 1 ? "not-allowed" : "pointer",
+                    }}
+                    disabled={templatesPage === 1}
+                    onClick={() => setTemplatesPage((p) => Math.max(1, p - 1))}
+                  >
+                    Prev
+                  </button>
+
+                  <span>
+                    Page <strong>{templatesPage}</strong> of{" "}
+                    <strong>{totalTemplatePages}</strong>
+                  </span>
+
+                  <button
+                    style={{
+                      ...styles.btnPrimary,
+                      background:
+                        templatesPage === totalTemplatePages
+                          ? "#9CA3AF"
+                          : "#186476",
+                      cursor:
+                        templatesPage === totalTemplatePages
+                          ? "not-allowed"
+                          : "pointer",
+                    }}
+                    disabled={templatesPage === totalTemplatePages}
+                    onClick={() =>
+                      setTemplatesPage((p) =>
+                        Math.min(totalTemplatePages, p + 1)
+                      )
+                    }
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
             )}
           </div>

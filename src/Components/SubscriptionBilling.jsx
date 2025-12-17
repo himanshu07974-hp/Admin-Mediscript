@@ -3,6 +3,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { useToast } from "../Components/ToastProvider";
 import { FaUsers, FaUserMd, FaUserGraduate } from "react-icons/fa";
 import RolesSelector from "./RolesSelector";
+import { Mail, Smartphone } from "lucide-react";
 import {
   FaCreditCard,
   FaTable,
@@ -762,33 +763,43 @@ function SubscriptionBilling() {
     table: {
       width: "100%",
       borderCollapse: "separate",
-      borderSpacing: "0 12px",
-      fontSize: "0.95rem",
+      borderSpacing: "0",
+      backgroundColor: "#ffffff",
+      borderRadius: "14px",
+      overflow: "hidden",
+      boxShadow: "0 12px 30px rgba(0,0,0,0.08)",
+      fontSize: "0.92rem",
     },
 
     th: {
-      background: "#0f4c75",
-      color: "#ffffff",
-      padding: "1rem",
-      borderRadius: "8px 8px 0 0",
       textAlign: "left",
+      padding: "14px 18px",
+      backgroundColor: "#F8FAFC",
+      color: "#334155",
       fontWeight: "700",
+      fontSize: "0.75rem",
+      textTransform: "uppercase",
+      letterSpacing: "0.08em",
+      borderBottom: "1px solid #E2E8F0",
+      whiteSpace: "nowrap",
     },
 
     td: {
-      padding: "1rem",
-      background: "#ffffff",
-      border: "1px solid #e2e8f0",
-      borderRadius: "8px",
-      boxShadow: "0 3px 10px rgba(0,0,0,0.05)",
+      padding: "14px 18px",
+      borderBottom: "1px solid #F1F5F9",
+      color: "#0F172A",
+      verticalAlign: "middle",
+      whiteSpace: "nowrap",
     },
 
     pagination: {
-      marginTop: "1.5rem",
       display: "flex",
-      justifyContent: "center",
-      gap: "0.5rem",
+      justifyContent: "space-between",
       alignItems: "center",
+      marginTop: "1.5rem",
+      padding: "0.75rem 0.5rem",
+      fontSize: "0.9rem",
+      color: "#334155",
     },
 
     /* MESSAGES */
@@ -820,10 +831,17 @@ function SubscriptionBilling() {
     },
 
     statusBadge: {
-      padding: "0.35rem 0.6rem",
-      borderRadius: "0.45rem",
-      fontWeight: 700,
-      display: "inline-block",
+      padding: "6px 14px",
+      borderRadius: "999px",
+      fontSize: "0.75rem",
+      fontWeight: "700",
+      color: "#ffffff",
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      minWidth: "88px",
+      textTransform: "capitalize",
+      boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
     },
   };
 
@@ -1514,56 +1532,88 @@ function SubscriptionBilling() {
         !transactionsError &&
         paginatedTransactions.length > 0 && (
           <>
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>ID</th>
-                  <th style={styles.th}>User</th>
-                  <th style={styles.th}>Phone</th>
-                  <th style={styles.th}>Amount</th>
-                  <th style={styles.th}>Status</th>
-                  <th style={styles.th}>Date</th>
-                  <th style={styles.th}>Auto Renew</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedTransactions.map((transaction) => (
-                  <tr key={transaction.id}>
-                    <td style={styles.td}>
-                      #{(transaction.id || "").substring(0, 8)}...
-                    </td>
-                    <td style={styles.td}>{transaction.userName}</td>
-                    <td style={styles.td}>{transaction.userPhone}</td>
-                    <td style={styles.td}>
-                      <strong>₹{transaction.amount}</strong>
-                    </td>
-                    <td style={styles.td}>
-                      <span
-                        style={{
-                          ...styles.statusBadge,
-                          backgroundColor: getStatusColor(transaction.status),
-                        }}
-                      >
-                        {getStatusText(transaction.status)}
-                      </span>
-                    </td>
-                    <td style={styles.td}>
-                      {formatDate(transaction.createdAt)}
-                    </td>
-                    <td style={styles.td}>
-                      <span
-                        style={{
-                          color: transaction.autoRenew ? "#10B981" : "#EF4444",
-                          fontWeight: "600",
-                        }}
-                      >
-                        {transaction.autoRenew ? "Yes" : "No"}
-                      </span>
-                    </td>
+            <div style={{ overflowX: "auto", borderRadius: "14px" }}>
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>ID</th>
+                    <th style={styles.th}>User</th>
+                    <th style={styles.th}>Phone</th>
+                    <th style={styles.th}>Amount</th>
+                    <th style={styles.th}>Status</th>
+                    <th style={styles.th}>Date</th>
+                    <th style={styles.th}>Auto Renew</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {paginatedTransactions.map((transaction, index) => (
+                    <tr
+                      key={transaction.id}
+                      style={{
+                        backgroundColor:
+                          index % 2 === 0 ? "#ffffff" : "#F9FAFB",
+                        transition: "background 0.2s ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "#EEF2FF";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background =
+                          index % 2 === 0 ? "#ffffff" : "#F9FAFB";
+                      }}
+                    >
+                      <td style={styles.td}>
+                        #{(transaction.id || "").substring(0, 8)}...
+                      </td>
+                      <td style={styles.td}>{transaction.userName}</td>
+                      <td style={styles.td}>{transaction.userPhone}</td>
+                      <td style={styles.td}>
+                        <span
+                          style={{
+                            fontWeight: "800",
+                            color: "#059669",
+                            fontSize: "0.95rem",
+                          }}
+                        >
+                          ₹{transaction.amount}
+                        </span>
+                      </td>
+                      <td style={styles.td}>
+                        <span
+                          style={{
+                            ...styles.statusBadge,
+                            backgroundColor: getStatusColor(transaction.status),
+                          }}
+                        >
+                          {getStatusText(transaction.status)}
+                        </span>
+                      </td>
+                      <td style={styles.td}>
+                        {formatDate(transaction.createdAt)}
+                      </td>
+                      <td style={styles.td}>
+                        <span
+                          style={{
+                            padding: "4px 10px",
+                            borderRadius: "999px",
+                            fontSize: "0.75rem",
+                            fontWeight: "700",
+                            background: transaction.autoRenew
+                              ? "#DCFCE7"
+                              : "#FEE2E2",
+                            color: transaction.autoRenew
+                              ? "#166534"
+                              : "#991B1B",
+                          }}
+                        >
+                          {transaction.autoRenew ? "Yes" : "No"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
             <div style={styles.pagination}>
               <button
@@ -1677,75 +1727,128 @@ function SubscriptionBilling() {
         !expiryUsersError &&
         paginatedExpiryUsers.length > 0 && (
           <>
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>Name</th>
-                  <th style={styles.th}>Phone</th>
-                  <th style={styles.th}>Role</th>
-                  <th style={styles.th}>Expiry Date</th>
-                  <th style={styles.th}>Days Left</th>
-                  <th style={styles.th}>Auto Renew</th>
-                  <th style={styles.th}>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedExpiryUsers.map((user) => (
-                  <tr key={user.id}>
-                    <td style={styles.td}>{user.name}</td>
-                    <td style={styles.td}>{user.phone}</td>
-                    <td style={styles.td}>
-                      <span
-                        style={{
-                          color:
-                            user.role === "doctor" ? "#186476ff" : "#F59E0B",
-                          fontWeight: "600",
-                        }}
-                      >
-                        {user.role}
-                      </span>
-                    </td>
-                    <td style={styles.td}>{formatDate(user.expiry)}</td>
-                    <td style={styles.td}>
-                      <span
-                        style={{
-                          color:
-                            (user.daysLeft || 0) <= 7 ? "#EF4444" : "#10B981",
-                          fontWeight: "600",
-                        }}
-                      >
-                        {user.daysLeft || 0} days
-                      </span>
-                    </td>
-                    <td style={styles.td}>
-                      <span
-                        style={{
-                          color: user.autoRenew ? "#10B981" : "#EF4444",
-                          fontWeight: "600",
-                        }}
-                      >
-                        {user.autoRenew ? "Yes" : "No"}
-                      </span>
-                    </td>
-                    <td style={styles.td}>
-                      <button
-                        style={{
-                          ...styles.button,
-                          background: "#3B82F6",
-                          padding: "0.25rem 0.5rem",
-                          fontSize: "0.8rem",
-                        }}
-                        onClick={() => setSelectedUserForReminder(user)}
-                      >
-                        <FaBell style={{ marginRight: "0.25rem" }} />
-                        Remind
-                      </button>
-                    </td>
+            <div style={{ overflowX: "auto", borderRadius: "14px" }}>
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>Name</th>
+                    <th style={styles.th}>Phone</th>
+                    <th style={styles.th}>Role</th>
+                    <th style={styles.th}>Expiry Date</th>
+                    <th style={styles.th}>Days Left</th>
+                    <th style={styles.th}>Auto Renew</th>
+                    <th style={styles.th}>Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {paginatedExpiryUsers.map((user, index) => (
+                    <tr
+                      key={user.id}
+                      style={{
+                        transition: "background 0.2s ease",
+                        backgroundColor:
+                          index % 2 === 0 ? "#ffffff" : "#F9FAFB",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "#EEF2FF";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background =
+                          index % 2 === 0 ? "#ffffff" : "#F9FAFB";
+                      }}
+                    >
+                      <td
+                        style={{
+                          ...styles.td,
+                          fontWeight: "600",
+                          color: "#0F172A",
+                        }}
+                      >
+                        {user.name}
+                      </td>
+                      <td style={{ ...styles.td, color: "#64748B" }}>
+                        {user.phone}
+                      </td>
+                      <td style={styles.td}>
+                        <span
+                          style={{
+                            padding: "4px 10px",
+                            borderRadius: "999px",
+                            fontSize: "0.75rem",
+                            fontWeight: "700",
+                            background:
+                              user.role === "doctor" ? "#E0F2FE" : "#FEF3C7",
+                            color:
+                              user.role === "doctor" ? "#075985" : "#92400E",
+                            textTransform: "capitalize",
+                          }}
+                        >
+                          {user.role}
+                        </span>
+                      </td>
 
+                      <td style={{ ...styles.td, color: "#334155" }}>
+                        {formatDate(user.expiry)}
+                      </td>
+                      <td style={styles.td}>
+                        <span
+                          style={{
+                            padding: "4px 12px",
+                            borderRadius: "999px",
+                            fontSize: "0.75rem",
+                            fontWeight: "700",
+                            background:
+                              (user.daysLeft || 0) <= 7 ? "#FEE2E2" : "#DCFCE7",
+                            color:
+                              (user.daysLeft || 0) <= 7 ? "#991B1B" : "#166534",
+                          }}
+                        >
+                          {user.daysLeft || 0} days
+                        </span>
+                      </td>
+
+                      <td style={styles.td}>
+                        <span
+                          style={{
+                            padding: "4px 10px",
+                            borderRadius: "999px",
+                            fontSize: "0.75rem",
+                            fontWeight: "700",
+                            background: user.autoRenew ? "#DCFCE7" : "#FEE2E2",
+                            color: user.autoRenew ? "#166534" : "#991B1B",
+                          }}
+                        >
+                          {user.autoRenew ? "Yes" : "No"}
+                        </span>
+                      </td>
+
+                      <td style={styles.td}>
+                        <button
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            background: "#3B82F6",
+                            color: "#fff",
+                            padding: "6px 12px",
+                            fontSize: "0.75rem",
+                            fontWeight: "700",
+                            borderRadius: "999px",
+                            border: "none",
+                            cursor: "pointer",
+                            boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
+                          }}
+                          onClick={() => setSelectedUserForReminder(user)}
+                        >
+                          <FaBell size={12} />
+                          Remind
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             <div style={styles.pagination}>
               <button
                 style={{
@@ -1842,29 +1945,81 @@ function SubscriptionBilling() {
                 </tr>
               </thead>
               <tbody>
-                {paginatedReminders.map((reminder) => (
-                  <tr key={reminder._id}>
+                {paginatedReminders.map((reminder, index) => (
+                  <tr
+                    key={reminder._id}
+                    style={{
+                      backgroundColor: index % 2 === 0 ? "#ffffff" : "#F9FAFB",
+                      transition: "background 0.2s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "#EEF2FF";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background =
+                        index % 2 === 0 ? "#ffffff" : "#F9FAFB";
+                    }}
+                  >
                     <td style={styles.td}>{reminder.userName}</td>
                     <td style={styles.td}>
                       {reminder.userEmail !== "N/A"
                         ? reminder.userEmail
                         : reminder.userPhone}
                     </td>
+                    {/* <td style={styles.td}>
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          padding: "6px 14px",
+                          borderRadius: "999px",
+                          fontSize: "0.75rem",
+                          fontWeight: "700",
+                          textTransform: "uppercase",
+                          background:
+                            reminder.type === "email" ? "#DBEAFE" : "#FEF3C7",
+                          color:
+                            reminder.type === "email" ? "#1D4ED8" : "#92400E",
+                          boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
+                        }}
+                      >
+                        {reminder.type === "email" ? "📧" : "📱"}
+                        {reminder.type}
+                      </span>
+                    </td> */}
+
                     <td style={styles.td}>
                       <span
                         style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          padding: "6px 14px",
+                          borderRadius: "999px",
+                          fontSize: "0.75rem",
+                          fontWeight: "700",
+                          letterSpacing: "0.05em",
+                          textTransform: "uppercase",
+                          background:
+                            reminder.type === "email" ? "#EFF6FF" : "#FFFBEB",
                           color:
-                            reminder.type === "email" ? "#186476ff" : "#F59E0B",
-                          fontWeight: "600",
-                          padding: "0.25rem 0.5rem",
-                          backgroundColor:
-                            reminder.type === "email" ? "#E0F2FE" : "#FEF3C7",
-                          borderRadius: "0.25rem",
+                            reminder.type === "email" ? "#1D4ED8" : "#92400E",
+                          border:
+                            reminder.type === "email"
+                              ? "1px solid #BFDBFE"
+                              : "1px solid #FDE68A",
                         }}
                       >
-                        {reminder.type.toUpperCase()}
+                        {reminder.type === "email" ? (
+                          <Mail size={14} strokeWidth={2} />
+                        ) : (
+                          <Smartphone size={14} strokeWidth={2} />
+                        )}
+                        {reminder.type}
                       </span>
                     </td>
+
                     <td style={styles.td}>
                       <span
                         style={{
@@ -1878,7 +2033,14 @@ function SubscriptionBilling() {
                         {reminder.status.toUpperCase()}
                       </span>
                     </td>
-                    <td style={styles.td} title={reminder.message}>
+                    <td
+                      style={{
+                        ...styles.td,
+                        maxWidth: "260px",
+                        color: "#475569",
+                      }}
+                      title={reminder.message}
+                    >
                       {reminder.message.substring(0, 40)}...
                     </td>
                     <td style={styles.td}>{reminder.timeAgo}</td>

@@ -25,7 +25,13 @@ import { useToast } from "../Components/ToastProvider"; // adjust path if needed
 import { toast } from "react-toastify/unstyled";
 
 // --- add this helper component near top of file ---
-function ActionMenu({ onViewPdf, onDelete, onSuspend, onReactivate,isSuspended }) {
+function ActionMenu({
+  onViewPdf,
+  onDelete,
+  onSuspend,
+  onReactivate,
+  isSuspended,
+}) {
   const [open, setOpen] = useState(false);
   const ref = React.useRef(null);
 
@@ -497,9 +503,10 @@ function UserManagement() {
     },
     tableContainer: {
       background: "#fff",
-      padding: 12,
-      borderRadius: 8,
-      marginTop: 12,
+      padding: 16,
+      borderRadius: 12,
+      marginTop: 16,
+      boxShadow: "0 8px 24px rgba(2,6,23,0.08)",
       overflowX: "auto",
     },
     button: {
@@ -510,33 +517,53 @@ function UserManagement() {
       cursor: "pointer",
     },
     actionContainer: { display: "flex", gap: 8 },
-    th: { padding: 10, textAlign: "left", borderBottom: "1px solid #e5e7eb" },
+    th: {
+      padding: "12px 10px",
+      textAlign: "left",
+      borderBottom: "1px solid #e5e7eb",
+      background: "#f8fafc",
+      fontSize: 13,
+      textTransform: "uppercase",
+      letterSpacing: "0.04em",
+      color: "#475569",
+    },
+
     td: { padding: 10, borderBottom: "1px solid #e5e7eb" },
   };
 
   const getStatusBadgeStyle = (status) => ({
-    padding: "0.25rem 0.5rem",
+    padding: "4px 10px",
     borderRadius: 999,
+    fontSize: 12,
+    fontWeight: 700,
     background:
       status === "active"
-        ? "#DCFCE7"
+        ? "#dcfce7"
         : status === "pending"
-        ? "#FEF3C7"
-        : "#FEE2E2",
+        ? "#fef3c7"
+        : "#fee2e2",
     color:
       status === "active"
-        ? "#10B981"
+        ? "#166534"
         : status === "pending"
-        ? "#F59E0B"
-        : "#EF4444",
-    fontWeight: 700,
+        ? "#92400e"
+        : "#991b1b",
   });
 
   const getId = (item) => item.id || item._id;
+  const tabStyle = (active) => ({
+    padding: "8px 16px",
+    borderRadius: 999,
+    border: "1px solid #186476",
+    background: active ? "#186476" : "#fff",
+    color: active ? "#fff" : "#186476",
+    fontWeight: 600,
+    cursor: "pointer",
+  });
 
   return (
     <div style={styles.container}>
-      <div style={{ marginBottom: 12 }}>
+      {/* <div style={{ marginBottom: 12 }}>
         <input
           placeholder="Search users by name..."
           value={searchName}
@@ -555,6 +582,49 @@ function UserManagement() {
         >
           <FaSearch style={{ marginRight: 6 }} /> Search
         </button>
+      </div> */}
+
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 16,
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ display: "flex", gap: 8 }}>
+          <input
+            placeholder="Search users by name..."
+            value={searchName}
+            onChange={(e) => setSearchName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+            style={{
+              padding: "10px 12px",
+              borderRadius: 8,
+              border: "1px solid #d1d5db",
+              width: 260,
+              fontSize: 14,
+            }}
+          />
+          <button
+            onClick={handleSearch}
+            style={{
+              background: "#186476",
+              color: "#fff",
+              borderRadius: 8,
+              padding: "0 14px",
+              border: "none",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontWeight: 600,
+            }}
+          >
+            <FaSearch /> Search
+          </button>
+        </div>
       </div>
 
       <div style={styles.headerContainer}>
@@ -562,7 +632,7 @@ function UserManagement() {
           <FaUserMd style={{ marginRight: 8 }} /> User Management
         </h2>
         <div style={{ display: "flex", gap: 8 }}>
-          <button
+          {/* <button
             onClick={() => setActiveTab("doctors")}
             style={{
               ...styles.button,
@@ -577,6 +647,20 @@ function UserManagement() {
               ...styles.button,
               background: activeTab === "students" ? "#186476" : "#6c757d",
             }}
+          >
+            Students
+          </button> */}
+
+          <button
+            onClick={() => setActiveTab("doctors")}
+            style={tabStyle(activeTab === "doctors")}
+          >
+            Doctors
+          </button>
+
+          <button
+            onClick={() => setActiveTab("students")}
+            style={tabStyle(activeTab === "students")}
           >
             Students
           </button>
@@ -606,7 +690,15 @@ function UserManagement() {
           <>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
-                <tr>
+                <tr
+                  style={{ transition: "background 0.2s" }}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.background = "#f8fafc")
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.background = "transparent")
+                  }
+                >
                   <th style={styles.th}>Name</th>
                   <th style={styles.th}>Email</th>
                   {activeTab === "students" && <th style={styles.th}>Phone</th>}
@@ -617,6 +709,7 @@ function UserManagement() {
                   <th style={styles.th}>Actions</th>
                 </tr>
               </thead>
+
               <tbody>
                 {paginatedList.map((u) => {
                   const uid = getId(u);
@@ -624,20 +717,25 @@ function UserManagement() {
                     <tr key={uid}>
                       <td style={styles.td}>{u.name || "N/A"}</td>
                       <td style={styles.td}>{u.email || "N/A"}</td>
+
                       {activeTab === "students" && (
                         <td style={styles.td}>{u.phone || "N/A"}</td>
                       )}
+
                       <td style={styles.td}>
                         <span style={getStatusBadgeStyle(u.status)}>
                           {u.status || "pending"}
                         </span>
                       </td>
+
                       <td style={styles.td}>
                         {u.subscription?.planId || u.plan || "No Plan"}
                       </td>
+
                       <td style={styles.td}>
                         {u.subscription?.status || u.planStatus || "none"}
                       </td>
+
                       <td style={styles.td}>
                         {u.subscription?.endDate
                           ? new Date(
@@ -647,34 +745,8 @@ function UserManagement() {
                           ? new Date(u.endDate).toLocaleDateString()
                           : "N/A"}
                       </td>
-                      <td style={styles.td}>
-                        {/* <div style={styles.actionContainer}>
-                          <button
-                            onClick={() =>
-                              handleViewPdf(
-                                uid,
-                                activeTab === "doctors" ? "doctor" : "student"
-                              )
-                            }
-                            disabled={pdfLoading}
-                            style={{ ...styles.button, background: "#0ea5e9" }}
-                          >
-                            View PDF
-                          </button>
 
-                          <button
-                            onClick={() =>
-                              handleDeleteUser(
-                                uid,
-                                activeTab === "doctors" ? "doctor" : "student"
-                              )
-                            }
-                            style={{ ...styles.button, background: "#ef4444" }}
-                          >
-                            Delete
-                          </button>
-                        </div> */}
-                        {/* REPLACE existing action buttons with this ActionMenu usage */}
+                      <td style={styles.td}>
                         <div style={styles.actionContainer}>
                           <ActionMenu
                             onViewPdf={() =>
@@ -702,33 +774,68 @@ function UserManagement() {
             </table>
 
             {/* pagination */}
+
             <div
               style={{
-                marginTop: 12,
+                marginTop: "1rem",
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
+                fontSize: "0.9rem",
+                color: "#334155",
               }}
             >
+              {/* Left: Showing info */}
               <div>
                 Showing{" "}
-                {safeList.length === 0
-                  ? 0
-                  : (currentPage - 1) * ITEMS_PER_PAGE + 1}
-                -{Math.min(currentPage * ITEMS_PER_PAGE, safeList.length)} of{" "}
-                {safeList.length}
+                <strong>
+                  {safeList.length === 0
+                    ? 0
+                    : (currentPage - 1) * ITEMS_PER_PAGE + 1}
+                </strong>
+                –
+                <strong>
+                  {Math.min(currentPage * ITEMS_PER_PAGE, safeList.length)}
+                </strong>{" "}
+                of <strong>{safeList.length}</strong>
               </div>
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+
+              {/* Right: Controls */}
+              <div
+                style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}
+              >
                 <button
                   onClick={() => goToPage(currentPage - 1)}
                   disabled={currentPage === 1}
+                  style={{
+                    padding: "0.4rem 0.75rem",
+                    borderRadius: "0.5rem",
+                    border: "none",
+                    background: currentPage === 1 ? "#9CA3AF" : "#186476",
+                    color: "#fff",
+                    fontWeight: "600",
+                    cursor: currentPage === 1 ? "not-allowed" : "pointer",
+                  }}
                 >
                   Prev
                 </button>
+
                 {renderPageButtons()}
+
                 <button
                   onClick={() => goToPage(currentPage + 1)}
                   disabled={currentPage === totalPages}
+                  style={{
+                    padding: "0.4rem 0.75rem",
+                    borderRadius: "0.5rem",
+                    border: "none",
+                    background:
+                      currentPage === totalPages ? "#9CA3AF" : "#186476",
+                    color: "#fff",
+                    fontWeight: "600",
+                    cursor:
+                      currentPage === totalPages ? "not-allowed" : "pointer",
+                  }}
                 >
                   Next
                 </button>
