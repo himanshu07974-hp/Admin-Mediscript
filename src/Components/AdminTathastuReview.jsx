@@ -1,10 +1,18 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axiosInstance from "../config/axiosConfig";
-import { FaArrowLeft, FaUserMd, FaStethoscope } from "react-icons/fa";
+import {
+  FaArrowLeft,
+  FaUserMd,
+  FaStethoscope,
+  FaPaperclip,
+  FaPaperPlane,
+  FaBars,
+  FaTimes,
+} from "react-icons/fa";
 import { format } from "date-fns";
 import { initSocket } from "../socket";
-import ChatFileBubble from "../Components/ChatFileBubble"; // adjust path if needed
+import ChatFileBubble from "../Components/ChatFileBubble";
 
 const AdminTathastuReview = () => {
   const { sessionId } = useParams();
@@ -16,6 +24,7 @@ const AdminTathastuReview = () => {
   const [saving, setSaving] = useState(false);
   const [responseText, setResponseText] = useState("");
   const [messages, setMessages] = useState([]);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const messagesEndRef = useRef(null);
   const socketRef = useRef(null);
 
@@ -45,7 +54,6 @@ const AdminTathastuReview = () => {
         msg.createdBy ||
         (msg.user && msg.user._id) ||
         null,
-      // type: msg.type || (msg.fileUrl ? "file" : "text"),
       type: msg.type || (msg.fileUrl ? "file" : text ? "text" : "system"),
       text,
       fileUrl: msg.fileUrl || msg.file?.url || null,
@@ -73,7 +81,6 @@ const AdminTathastuReview = () => {
         if (Array.isArray(data.messages)) {
           console.log("FULL SESSION DATA:", data);
 
-          // attach senderId fallback from session-level ids (so we can detect ownership)
           const prepared = (data.messages || []).map((m) =>
             normalizeMessage({
               ...m,
@@ -82,11 +89,9 @@ const AdminTathastuReview = () => {
                 m.fromId ||
                 m.userId ||
                 m.adminId ||
-                // if message from admin but no id, use session.adminId
                 ((m.from || m.sender || "").toString().toLowerCase() === "admin"
                   ? data.adminId || data.admin?._id || null
                   : null) ||
-                // if from doctor, use session.doctorId
                 ((m.from || m.sender || "").toString().toLowerCase() ===
                 "doctor"
                   ? data.doctorId || data.doctor?._id || null
@@ -130,49 +135,12 @@ const AdminTathastuReview = () => {
 
     const socket = socketRef.current;
 
-    // const handleDoctorReply = (payload) => {
-    //   if (!payload) return;
-    //   if (String(payload.sessionId) !== String(sessionId)) return;
-
-    //   const raw = payload.messageObject || payload.message || payload;
-    //   console.log("raw", raw);
-    //   // if (!raw) return;
-
-    //   if (!raw.text && !raw.fileUrl) {
-    //     console.log("Socket event without message, syncing from API...");
-    //     //loadSession(); // 🔥 THIS FIXES IT
-    //     return;
-    //   }
-
-    //   const normalized = normalizeMessage(raw);
-
-    //   setMessages((prev) => {
-    //     // ✅ strongest duplicate check: DB id
-    //     if (normalized._id && prev.some((m) => m._id === normalized._id)) {
-    //       return prev;
-    //     }
-
-    //     // ✅ optional file duplicate check (SAFE now)
-    //     if (
-    //       normalized.fileUrl &&
-    //       prev.some((m) => m.fileUrl === normalized.fileUrl)
-    //     ) {
-    //       return prev;
-    //     }
-
-    //     return [...prev, normalized];
-    //   });
-
-    //   setTimeout(scrollToBottom, 50);
-    // };
-
     const handleDoctorReply = (payload) => {
       if (!payload) return;
       if (String(payload.sessionId) !== String(sessionId)) return;
 
       let raw = payload.messageObject || payload.message || payload;
 
-      // ✅ FIX: text string ko object me convert karo
       if (typeof raw === "string") {
         raw = {
           from: "doctor",
@@ -183,18 +151,15 @@ const AdminTathastuReview = () => {
         };
       }
 
-      // safety check
       if (!raw.text && !raw.fileUrl) return;
 
       const normalized = normalizeMessage(raw);
 
       setMessages((prev) => {
-        // duplicate check by DB id
         if (normalized._id && prev.some((m) => m._id === normalized._id)) {
           return prev;
         }
 
-        // file duplicate check
         if (
           normalized.fileUrl &&
           prev.some((m) => m.fileUrl === normalized.fileUrl)
@@ -215,7 +180,7 @@ const AdminTathastuReview = () => {
       socket.off("doctorReplyAdmin", handleDoctorReply);
       socket.off("doctorFileMessage", handleDoctorReply);
     };
-  }, [sessionId]); // ✅ EMPTY dependency
+  }, [sessionId, session]);
 
   const handleSubmitResponse = async () => {
     const trimmed = responseText.trim();
@@ -243,7 +208,6 @@ const AdminTathastuReview = () => {
         status: updated.status || "ADMIN_REPLIED",
       }));
 
-      // Prefer server-returned messages array if present
       const returnedMessages =
         (updated && Array.isArray(updated.messages) && updated.messages) ||
         (res.data?.session &&
@@ -257,13 +221,11 @@ const AdminTathastuReview = () => {
       if (returnedMessages) {
         setMessages(returnedMessages.map(normalizeMessage));
       } else {
-        // server might return the single created message
         const backendMsg =
           res.data?.message || res.data?.createdMessage || null;
         if (backendMsg) {
           setMessages((prev) => [...prev, normalizeMessage(backendMsg)]);
         } else {
-          // optimistic fallback, attach senderId so future comparisons work
           const now = new Date().toISOString();
           const optimistic = normalizeMessage({
             from: "admin",
@@ -305,12 +267,11 @@ const AdminTathastuReview = () => {
     setError("");
     const tempId = `temp-${Date.now()}`;
     try {
-      // show local uploading bubble (no remote preview for other user)
       const optimistic = normalizeMessage({
         from: "admin",
         senderId: localStorage.getItem("userId"),
         type: "file",
-        fileUrl: null, // will appear after server response
+        fileUrl: null,
         fileName: file.name,
         mimeType: file.type,
         time: new Date().toISOString(),
@@ -335,11 +296,9 @@ const AdminTathastuReview = () => {
         throw new Error("Invalid API response: no message returned");
       }
 
-      // if backend returned the saved message with fileUrl/_id -> replace optimistic
       const backendMsg = res.data?.messageObject || uploaded;
       const normalized = normalizeMessage({
         ...backendMsg,
-        // ensure senderId present
         senderId:
           backendMsg.senderId ||
           backendMsg.userId ||
@@ -347,11 +306,9 @@ const AdminTathastuReview = () => {
         type: backendMsg.type || "file",
       });
 
-      // If backend returned an _id, replace the temp message; else, merge by filename/time
       if (normalized._id) {
         replaceMessageByTempId(tempId, normalized);
       } else {
-        // fallback: append normalized and remove optimistic
         setMessages((prev) => [
           ...prev.filter((m) => m._tempId !== tempId),
           normalized,
@@ -362,7 +319,6 @@ const AdminTathastuReview = () => {
     } catch (err) {
       console.error("File upload error:", err, err.response?.data);
       setError("Failed to upload file");
-      // mark optimistic as error
       setMessages((prev) =>
         prev.map((m) =>
           m._tempId === tempId
@@ -393,53 +349,12 @@ const AdminTathastuReview = () => {
     const fromRaw = (msg.from || msg.sender || "system")
       .toString()
       .toLowerCase();
-    // Ownership: id-based preferred; else role-based heuristic
     const isMine =
       (msg.senderId && String(msg.senderId) === String(currentUserId)) ||
       fromRaw === currentUserRole ||
       (fromRaw === "admin" && currentUserRole.includes("admin"));
 
     const isSystem = fromRaw === "system";
-
-    const wrapperJustify = isSystem
-      ? "center"
-      : isMine
-      ? "flex-end"
-      : "flex-start";
-
-    const bubbleBase = {
-      maxWidth: "72%",
-      padding: "10px 12px",
-      borderRadius: 16,
-      fontSize: 13,
-      boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-      wordBreak: "break-word",
-      whiteSpace: "pre-wrap",
-    };
-
-    const bubbleStyle = isSystem
-      ? {
-          ...bubbleBase,
-          background: "#f1f5f9",
-          color: "#374151",
-          borderRadius: 12,
-          maxWidth: "60%",
-        }
-      : isMine
-      ? {
-          ...bubbleBase,
-          background: "linear-gradient(135deg,#024e5a,#036a7a)",
-          color: "white",
-          borderRadius: "16px 16px 4px 16px",
-          marginLeft: "auto",
-        }
-      : {
-          ...bubbleBase,
-          background: "#ffffff",
-          color: "#111827",
-          borderRadius: "16px 16px 16px 4px",
-          marginRight: "auto",
-        };
 
     const label = isSystem
       ? "System"
@@ -449,47 +364,146 @@ const AdminTathastuReview = () => {
       ? "Doctor"
       : msg.from || "User";
 
-    const timeStr = formatTime(msg.time || msg.createdAt);
+    // Format time to show only time (like WhatsApp)
+    const getTimeOnly = (dt) => {
+      if (!dt) return "";
+      try {
+        return format(new Date(dt), "p"); // e.g., "6:31 PM"
+      } catch {
+        return "";
+      }
+    };
+
+    const timeStr = getTimeOnly(msg.time || msg.createdAt);
 
     return (
       <div
         style={{
           display: "flex",
-          justifyContent: wrapperJustify,
-          marginBottom: 12,
-          paddingLeft: 8,
-          paddingRight: 8,
+          justifyContent: isSystem
+            ? "center"
+            : isMine
+            ? "flex-end"
+            : "flex-start",
+          marginBottom: "4px",
+          paddingLeft: "12px",
+          paddingRight: "12px",
         }}
       >
-        <div style={{ maxWidth: "100%" }}>
+        <div
+          style={{
+            maxWidth: isSystem ? "70%" : "65%",
+            display: "inline-block",
+          }}
+        >
+          {/* Sender label only for non-system and non-mine messages */}
+          {!isSystem && !isMine && (
+            <div
+              style={{
+                fontSize: "11px",
+                fontWeight: "600",
+                color: "#025f6d",
+                marginBottom: "2px",
+                paddingLeft: "4px",
+              }}
+            >
+              {label}
+            </div>
+          )}
+
           <div
             style={{
-              display: "flex",
-              justifyContent: isMine
-                ? "flex-end"
-                : isSystem
-                ? "center"
-                : "flex-start",
-              marginBottom: 6,
+              padding:
+                msg.type === "file"
+                  ? "6px"
+                  : isSystem
+                  ? "8px 12px"
+                  : "7px 10px 7px 10px",
+              borderRadius: isSystem
+                ? "8px"
+                : isMine
+                ? "8px 8px 0px 8px"
+                : "0px 8px 8px 8px",
+              fontSize: "13.5px",
+              lineHeight: "1.4",
+              boxShadow: isSystem
+                ? "0 1px 2px rgba(0,0,0,0.05)"
+                : "0 1px 2px rgba(0,0,0,0.12)",
+              wordBreak: "break-word",
+              whiteSpace: "pre-wrap",
+              background: isSystem ? "#f1f5f9" : isMine ? "#005c4b" : "#ffffff",
+              color: isSystem ? "#475569" : isMine ? "#ffffff" : "#1f2937",
+              border: isSystem ? "none" : isMine ? "none" : "1px solid #e5e7eb",
+              display: "inline-block",
+              maxWidth: "100%",
+              position: "relative",
             }}
           >
-            <small style={{ fontSize: 11, color: "#6b7280" }}>
-              {label} • {timeStr}
-            </small>
-          </div>
-
-          <div style={bubbleStyle}>
             {msg.type === "file" ? (
-              <ChatFileBubble
-                from={msg.from}
-                senderId={msg.senderId}
-                fileUrl={msg.fileUrl}
-                fileName={msg.fileName}
-                mimeType={msg.mimeType}
-                time={msg.time}
-              />
+              <div>
+                <ChatFileBubble
+                  isMine={isMine}
+                  from={msg.from}
+                  senderId={msg.senderId}
+                  fileUrl={msg.fileUrl}
+                  fileName={msg.fileName}
+                  mimeType={msg.mimeType}
+                  time={msg.time}
+                />
+                {/* Time below file */}
+                {!isSystem && (
+                  <div
+                    style={{
+                      fontSize: "10px",
+                      color: isMine ? "rgba(255,255,255,0.7)" : "#667781",
+                      marginTop: "4px",
+                      textAlign: "right",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "flex-end",
+                      gap: "3px",
+                    }}
+                  >
+                    {timeStr}
+                  </div>
+                )}
+              </div>
             ) : (
-              <div>{msg.text}</div>
+              <div
+                style={{ display: "flex", alignItems: "flex-end", gap: "6px" }}
+              >
+                <div style={{ flex: 1 }}>{msg.text}</div>
+                {/* Time inside bubble at bottom-right like WhatsApp */}
+                {!isSystem && (
+                  <div
+                    style={{
+                      fontSize: "10px",
+                      color: isMine ? "rgba(255,255,255,0.7)" : "#667781",
+                      whiteSpace: "nowrap",
+                      paddingLeft: "8px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "3px",
+                      alignSelf: "flex-end",
+                    }}
+                  >
+                    {timeStr}
+                    {isMine && (
+                      <svg
+                        width="16"
+                        height="11"
+                        viewBox="0 0 16 11"
+                        fill="none"
+                      >
+                        <path
+                          d="M11.071.653a.5.5 0 0 0-.707 0L6.5 4.517 4.136 2.153a.5.5 0 0 0-.707.707l2.718 2.718a.5.5 0 0 0 .707 0l4.217-4.218a.5.5 0 0 0 0-.707zM15.071.653a.5.5 0 0 0-.707 0L10.5 4.517 8.136 2.153a.5.5 0 0 0-.707.707l2.718 2.718a.5.5 0 0 0 .707 0l4.217-4.218a.5.5 0 0 0 0-.707z"
+                          fill="rgba(255,255,255,0.7)"
+                        />
+                      </svg>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -506,348 +520,712 @@ const AdminTathastuReview = () => {
         height: "100vh",
         display: "flex",
         flexDirection: "column",
-        background: "#f3f4f6",
-        fontFamily: "'Inter', system-ui, sans-serif",
+        background: "#f9fafb",
+        fontFamily:
+          "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+        overflow: "hidden",
       }}
     >
       {/* Header */}
-      <div
+      <header
         style={{
-          padding: "14px 20px",
-          background: "linear-gradient(135deg,#024e5a,#036a7a)",
+          padding: "16px 20px",
+          background: "linear-gradient(135deg, #024e5a, #036a7a)",
           color: "white",
           display: "flex",
           alignItems: "center",
-          gap: 12,
-          boxShadow: "0 4px 16px rgba(0,0,0,0.18)",
+          gap: "12px",
+          boxShadow: "0 4px 16px rgba(2, 78, 90, 0.25)",
+          position: "relative",
+          zIndex: 10,
+          flexShrink: 0,
         }}
       >
         <button
           onClick={() => navigate("/tathastu-sessions")}
+          aria-label="Go back"
           style={{
             border: "none",
-            background: "transparent",
+            background: "rgba(255,255,255,0.15)",
             color: "white",
             cursor: "pointer",
             display: "flex",
             alignItems: "center",
-            padding: 6,
-            borderRadius: 999,
+            justifyContent: "center",
+            padding: "8px",
+            borderRadius: "8px",
+            transition: "background 0.2s",
+            width: "36px",
+            height: "36px",
+            flexShrink: 0,
+          }}
+          onMouseEnter={(e) =>
+            (e.currentTarget.style.background = "rgba(255,255,255,0.25)")
+          }
+          onMouseLeave={(e) =>
+            (e.currentTarget.style.background = "rgba(255,255,255,0.15)")
+          }
+        >
+          <FaArrowLeft size={16} />
+        </button>
+
+        <button
+          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          aria-label="Toggle sidebar"
+          className="mobile-menu-btn"
+          style={{
+            border: "none",
+            background: "rgba(255,255,255,0.15)",
+            color: "white",
+            cursor: "pointer",
+            display: "none",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "8px",
+            borderRadius: "8px",
+            width: "36px",
+            height: "36px",
+            flexShrink: 0,
           }}
         >
-          <FaArrowLeft size={18} />
+          {isSidebarOpen ? <FaTimes size={16} /> : <FaBars size={16} />}
         </button>
-        <div>
-          <div style={{ fontSize: 18, fontWeight: 700 }}>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{ fontSize: "18px", fontWeight: "700", marginBottom: "4px" }}
+          >
             TATHASTU Case Review
           </div>
-          <div style={{ fontSize: 13, opacity: 0.9, marginTop: 2 }}>
+          <div
+            style={{
+              fontSize: "12px",
+              opacity: 0.95,
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              flexWrap: "wrap",
+            }}
+          >
             {doctor?.name && (
-              <>
-                <FaUserMd size={12} style={{ marginRight: 4 }} />
-                {doctor.name}
-              </>
+              <span
+                style={{ display: "flex", alignItems: "center", gap: "4px" }}
+              >
+                <FaUserMd size={12} />
+                <span className="doctor-name">{doctor.name}</span>
+              </span>
             )}
             {doctor?.specialization && (
-              <>
-                <span> • </span>
-                <FaStethoscope size={12} /> {doctor.specialization}
-              </>
+              <span
+                style={{ display: "flex", alignItems: "center", gap: "4px" }}
+              >
+                <FaStethoscope size={12} />
+                <span className="doctor-spec">{doctor.specialization}</span>
+              </span>
             )}
           </div>
         </div>
-        <div style={{ marginLeft: "auto", fontSize: 12, opacity: 0.9 }}>
-          Session:{" "}
-          <span style={{ fontFamily: "monospace" }}>
-            {sessionId?.slice(0, 8)}…
-          </span>
+
+        <div
+          className="session-id-display"
+          style={{
+            fontSize: "11px",
+            opacity: 0.9,
+            fontFamily: "monospace",
+            flexShrink: 0,
+          }}
+        >
+          Session: {sessionId?.slice(0, 8)}…
         </div>
-      </div>
+      </header>
 
       {/* Body */}
       <div
         style={{
           flex: 1,
-          display: "grid",
-          gridTemplateColumns: "minmax(280px, 360px) 1fr",
-          gap: 16,
-          padding: 16,
+          display: "flex",
           overflow: "hidden",
+          position: "relative",
         }}
       >
-        <div
+        {/* Sidebar Overlay for mobile */}
+        {isSidebarOpen && (
+          <div
+            className="sidebar-overlay"
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: "rgba(0,0,0,0.5)",
+              zIndex: 4,
+              display: "none",
+            }}
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        )}
+
+        {/* Sidebar */}
+        <aside
+          className="patient-sidebar"
           style={{
+            width: "360px",
+            maxWidth: "100%",
             background: "white",
-            borderRadius: 14,
-            padding: 16,
-            boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+            borderRight: "1px solid #e5e7eb",
             overflowY: "auto",
+            transition: "transform 0.3s ease",
+            zIndex: 5,
+            flexShrink: 0,
           }}
         >
-          {loading ? (
-            <div>Loading patient details…</div>
-          ) : error ? (
-            <div style={{ color: "#b91c1c", fontSize: 13 }}>{error}</div>
-          ) : !session ? (
-            <div>No session data.</div>
-          ) : (
-            <>
-              <h3
+          <div style={{ padding: "20px" }}>
+            {loading ? (
+              <div
                 style={{
-                  marginTop: 0,
-                  marginBottom: 8,
-                  fontSize: 16,
-                  fontWeight: 600,
-                  color: "#111827",
-                }}
-              >
-                Patient Details
-              </h3>
-              <p
-                style={{
-                  fontSize: 12,
+                  textAlign: "center",
+                  padding: "40px 20px",
                   color: "#6b7280",
-                  marginTop: 0,
-                  marginBottom: 12,
                 }}
               >
-                Please verify all fields before generating prescription.
-              </p>
-              <div style={{ display: "grid", rowGap: 8 }}>
-                <FieldRow label="Patient Name" value={patient.name} />
-                <FieldRow label="Age / Sex" value={patient.ageSex} />
-                <FieldRow label="Weight (kg)" value={patient.weight} />
-                <FieldRow label="Height" value={patient.height} />
-                <FieldRow
-                  label="Pregnancy / Lactation"
-                  value={patient.pregnancyStatus}
-                />
-                <FieldRow
-                  label="Diagnosis / Provisional"
-                  value={patient.diagnosis}
-                  multi
-                />
-                <FieldRow
-                  label="Clinical Notes / Symptoms"
-                  value={patient.clinicalNotes}
-                  multi
-                />
-                <FieldRow
-                  label="Allergies / Comorbidities"
-                  value={patient.allergies}
-                  multi
-                />
-                <FieldRow
-                  label="Current Medications"
-                  value={patient.medications}
-                  multi
-                />
-                <FieldRow
-                  label="Key Investigation Values"
-                  value={patient.investigations}
-                  multi
-                />
+                <div style={{ fontSize: "14px" }}>Loading patient details…</div>
+              </div>
+            ) : error ? (
+              <div
+                style={{
+                  color: "#dc2626",
+                  fontSize: "14px",
+                  padding: "20px",
+                  background: "#fef2f2",
+                  borderRadius: "8px",
+                  border: "1px solid #fecaca",
+                }}
+              >
+                {error}
+              </div>
+            ) : !session ? (
+              <div
+                style={{
+                  textAlign: "center",
+                  padding: "40px 20px",
+                  color: "#6b7280",
+                }}
+              >
+                No session data.
+              </div>
+            ) : (
+              <>
+                <div style={{ marginBottom: "20px" }}>
+                  <h3
+                    style={{
+                      margin: "0 0 8px 0",
+                      fontSize: "18px",
+                      fontWeight: "700",
+                      color: "#111827",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: "4px",
+                        height: "20px",
+                        background: "linear-gradient(135deg, #024e5a, #036a7a)",
+                        borderRadius: "2px",
+                      }}
+                    ></span>
+                    Patient Details
+                  </h3>
+                  <p
+                    style={{
+                      fontSize: "12px",
+                      color: "#6b7280",
+                      margin: "0",
+                    }}
+                  >
+                    Verify all information before prescribing
+                  </p>
+                </div>
+
                 <div
                   style={{
-                    marginTop: 10,
-                    padding: 8,
-                    borderRadius: 8,
-                    background: "#eff6ff",
-                    color: "#1d4ed8",
-                    fontSize: 11,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "12px",
                   }}
                 >
-                  Note: TATHASTU only assists. Final prescription must be
-                  clinically reviewed and signed by the RMP.
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+                  <FieldRow label="Patient Name" value={patient.name} />
+                  <FieldRow label="Age / Sex" value={patient.ageSex} />
+                  <FieldRow label="Weight (kg)" value={patient.weight} />
+                  <FieldRow label="Height" value={patient.height} />
+                  <FieldRow
+                    label="Pregnancy / Lactation"
+                    value={patient.pregnancyStatus}
+                  />
+                  <FieldRow
+                    label="Diagnosis / Provisional"
+                    value={patient.diagnosis}
+                    multi
+                  />
+                  <FieldRow
+                    label="Clinical Notes / Symptoms"
+                    value={patient.clinicalNotes}
+                    multi
+                  />
+                  <FieldRow
+                    label="Allergies / Comorbidities"
+                    value={patient.allergies}
+                    multi
+                  />
+                  <FieldRow
+                    label="Current Medications"
+                    value={patient.medications}
+                    multi
+                  />
+                  <FieldRow
+                    label="Key Investigation Values"
+                    value={patient.investigations}
+                    multi
+                  />
 
-        <div
+                  <div
+                    style={{
+                      marginTop: "12px",
+                      padding: "12px",
+                      borderRadius: "10px",
+                      background:
+                        "linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%)",
+                      border: "1px solid #bfdbfe",
+                      fontSize: "11px",
+                      lineHeight: "1.5",
+                      color: "#1e40af",
+                    }}
+                  >
+                    <strong>⚕️ Important:</strong> TATHASTU is an AI assistant.
+                    All prescriptions must be clinically reviewed and signed by
+                    a registered medical practitioner.
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </aside>
+
+        {/* Chat Area */}
+        <main
           style={{
+            flex: 1,
             display: "flex",
             flexDirection: "column",
             background: "white",
-            borderRadius: 14,
-            boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
             overflow: "hidden",
+            minWidth: 0,
           }}
         >
+          {/* Messages */}
           <div
             style={{
               flex: 1,
-              padding: 16,
               overflowY: "auto",
-              background: "linear-gradient(to bottom,#f9fafb,#e5f0f4)",
-              display: "flex",
-              flexDirection: "column",
-              gap: 6,
-              alignItems: "stretch",
+              background: "#efeae2",
+              padding: "20px 0",
             }}
           >
-            <h3
-              style={{
-                marginTop: 0,
-                marginBottom: 8,
-                fontSize: 15,
-                fontWeight: 600,
-                color: "#111827",
-              }}
-            >
-              Case Timeline
-            </h3>
-            <p
-              style={{
-                marginTop: 0,
-                marginBottom: 12,
-                fontSize: 12,
-                color: "#6b7280",
-              }}
-            >
-              Below is how the doctor filled the case with TATHASTU prompts.
-            </p>
-
-            {loading ? (
-              <div>Loading messages…</div>
-            ) : messages.length ? (
-              <>
-                {/* {messages.map((m) =>
-                  renderMessageBubble(m, m._id || m._tempId)
-                )} */}
-                {messages.map((m) => (
-                  <div key={m._key}>{renderMessageBubble(m)}</div>
-                ))}
-
-                <div ref={messagesEndRef} />
-              </>
-            ) : (
-              <div style={{ fontSize: 13, color: "#6b7280" }}>
-                No timeline messages available.
+            <div style={{ maxWidth: "900px", margin: "0 auto", width: "100%" }}>
+              <div
+                style={{
+                  padding: "0 16px 16px 16px",
+                  borderBottom: "1px solid #e5e7eb",
+                  marginBottom: "20px",
+                }}
+              >
+                <h3
+                  style={{
+                    margin: "0 0 6px 0",
+                    fontSize: "16px",
+                    fontWeight: "700",
+                    color: "#111827",
+                  }}
+                >
+                  Case Timeline
+                </h3>
+                <p
+                  style={{
+                    margin: "0",
+                    fontSize: "13px",
+                    color: "#6b7280",
+                  }}
+                >
+                  Conversation between doctor and TATHASTU AI
+                </p>
               </div>
-            )}
+
+              {loading ? (
+                <div
+                  style={{
+                    textAlign: "center",
+                    padding: "60px 20px",
+                    color: "#6b7280",
+                  }}
+                >
+                  <div style={{ fontSize: "14px" }}>Loading messages…</div>
+                </div>
+              ) : messages.length ? (
+                <>
+                  {messages.map((m) => (
+                    <div key={m._key}>{renderMessageBubble(m)}</div>
+                  ))}
+                  <div ref={messagesEndRef} />
+                </>
+              ) : (
+                <div
+                  style={{
+                    textAlign: "center",
+                    padding: "60px 20px",
+                    color: "#9ca3af",
+                    fontSize: "14px",
+                  }}
+                >
+                  No messages yet
+                </div>
+              )}
+            </div>
           </div>
 
+          {/* Input Area */}
           <div
             style={{
               borderTop: "1px solid #e5e7eb",
-              padding: 14,
-              background: "#f9fafb",
+              background: "white",
+              padding: "16px 20px",
+              boxShadow: "0 -4px 16px rgba(0,0,0,0.04)",
+              flexShrink: 0,
             }}
           >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                marginBottom: 6,
-              }}
-            >
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>
-                Final Prescription / Advice
-              </span>
-              <span
+            <div style={{ maxWidth: "900px", margin: "0 auto" }}>
+              <div
                 style={{
-                  fontSize: 11,
-                  color:
-                    session?.status === "ADMIN_REPLIED" ? "#22c55e" : "#9ca3af",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "12px",
+                  gap: "12px",
+                  flexWrap: "wrap",
                 }}
               >
-                Status: {session?.status || "—"}
-              </span>
-            </div>
-
-            <textarea
-              rows={6}
-              value={responseText}
-              onChange={(e) => setResponseText(e.target.value)}
-              placeholder="Type the final prescription here (dose, frequency, duration, advice)…"
-              style={{
-                width: "100%",
-                resize: "vertical",
-                borderRadius: 8,
-                border: "1px solid #d1d5db",
-                padding: 10,
-                fontSize: 13,
-                outline: "none",
-              }}
-            />
-
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginTop: 8,
-                gap: 8,
-              }}
-            >
-              <small style={{ fontSize: 11, color: "#6b7280" }}>
-                You can send prescription or attach files (PDF, images,
-                reports).
-              </small>
-
-              <div style={{ display: "flex", gap: 8 }}>
-                <input
-                  type="file"
-                  id="fileUpload"
-                  style={{ display: "none" }}
-                  onChange={handleFileUpload}
-                />
-                <button
-                  onClick={() => document.getElementById("fileUpload").click()}
+                <span
                   style={{
-                    padding: "8px 12px",
-                    borderRadius: 999,
-                    border: "none",
-                    background: "#475569",
-                    color: "white",
-                    cursor: "pointer",
-                    fontSize: 13,
+                    fontSize: "14px",
+                    fontWeight: "600",
+                    color: "#111827",
                   }}
                 >
-                  📎 Send File
-                </button>
-                <button
-                  onClick={handleSubmitResponse}
-                  disabled={
-                    saving || !responseText.trim() || !sessionId || loading
-                  }
+                  Final Prescription
+                </span>
+                <span
                   style={{
-                    padding: "8px 16px",
-                    borderRadius: 999,
-                    border: "none",
+                    fontSize: "11px",
+                    padding: "4px 10px",
+                    borderRadius: "12px",
                     background:
-                      saving || !responseText.trim()
-                        ? "#cbd5e1"
-                        : "linear-gradient(135deg,#024e5a,#036a7a)",
-                    color: "white",
-                    cursor:
-                      saving || !responseText.trim()
-                        ? "not-allowed"
-                        : "pointer",
-                    fontSize: 13,
-                    fontWeight: 500,
+                      session?.status === "ADMIN_REPLIED"
+                        ? "#dcfce7"
+                        : "#f3f4f6",
+                    color:
+                      session?.status === "ADMIN_REPLIED"
+                        ? "#166534"
+                        : "#6b7280",
+                    fontWeight: "600",
                   }}
                 >
-                  {saving ? "Sending…" : "Send Prescription"}
-                </button>
+                  {session?.status || "PENDING"}
+                </span>
               </div>
-            </div>
 
-            {error && (
-              <div style={{ marginTop: 6, fontSize: 12, color: "#b91c1c" }}>
-                {error}
+              <div style={{ position: "relative" }}>
+                <textarea
+                  rows={4}
+                  value={responseText}
+                  onChange={(e) => setResponseText(e.target.value)}
+                  placeholder="Type the final prescription here (medications, dosage, duration, and advice)…"
+                  style={{
+                    width: "100%",
+                    resize: "vertical",
+                    borderRadius: "12px",
+                    border: "1px solid #d1d5db",
+                    padding: "14px 16px",
+                    fontSize: "14px",
+                    outline: "none",
+                    fontFamily: "inherit",
+                    transition: "border-color 0.2s",
+                    boxSizing: "border-box",
+                  }}
+                  onFocus={(e) => (e.target.style.borderColor = "#024e5a")}
+                  onBlur={(e) => (e.target.style.borderColor = "#d1d5db")}
+                />
               </div>
-            )}
+
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginTop: "12px",
+                  gap: "12px",
+                  flexWrap: "wrap",
+                }}
+              >
+                <small
+                  className="helper-text"
+                  style={{
+                    fontSize: "12px",
+                    color: "#6b7280",
+                    flex: "1",
+                    minWidth: "200px",
+                  }}
+                >
+                  Send prescription text or attach files (PDF, images, reports)
+                </small>
+
+                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                  <input
+                    type="file"
+                    id="fileUpload"
+                    style={{ display: "none" }}
+                    onChange={handleFileUpload}
+                  />
+                  <button
+                    onClick={() =>
+                      document.getElementById("fileUpload").click()
+                    }
+                    disabled={saving}
+                    aria-label="Upload file"
+                    style={{
+                      padding: "10px 18px",
+                      borderRadius: "10px",
+                      border: "1px solid #d1d5db",
+                      background: "white",
+                      color: "#374151",
+                      cursor: saving ? "not-allowed" : "pointer",
+                      fontSize: "14px",
+                      fontWeight: "500",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      transition: "all 0.2s",
+                      opacity: saving ? 0.6 : 1,
+                      flexShrink: 0,
+                    }}
+                    onMouseEnter={(e) =>
+                      !saving && (e.currentTarget.style.background = "#f9fafb")
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.background = "white")
+                    }
+                  >
+                    <FaPaperclip size={14} />
+                    <span className="button-text">File</span>
+                  </button>
+
+                  <button
+                    onClick={handleSubmitResponse}
+                    disabled={
+                      saving || !responseText.trim() || !sessionId || loading
+                    }
+                    aria-label="Send prescription"
+                    style={{
+                      padding: "10px 24px",
+                      borderRadius: "10px",
+                      border: "none",
+                      background:
+                        saving || !responseText.trim()
+                          ? "#cbd5e1"
+                          : "linear-gradient(135deg, #024e5a, #036a7a)",
+                      color: "white",
+                      cursor:
+                        saving || !responseText.trim()
+                          ? "not-allowed"
+                          : "pointer",
+                      fontSize: "14px",
+                      fontWeight: "600",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      transition: "all 0.2s",
+                      boxShadow:
+                        saving || !responseText.trim()
+                          ? "none"
+                          : "0 4px 12px rgba(2, 78, 90, 0.25)",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {saving ? (
+                      "Sending…"
+                    ) : (
+                      <>
+                        <FaPaperPlane size={14} />
+                        <span className="button-text">Send</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {error && (
+                <div
+                  role="alert"
+                  style={{
+                    marginTop: "12px",
+                    padding: "12px",
+                    fontSize: "13px",
+                    color: "#dc2626",
+                    background: "#fef2f2",
+                    borderRadius: "8px",
+                    border: "1px solid #fecaca",
+                  }}
+                >
+                  {error}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        </main>
       </div>
+
+      {/* Responsive Styles */}
+      <style>{`
+        @media (max-width: 1024px) {
+          .patient-sidebar {
+            position: absolute !important;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 360px !important;
+            transform: ${isSidebarOpen ? "translateX(0)" : "translateX(-100%)"};
+          }
+          
+          .sidebar-overlay {
+            display: ${isSidebarOpen ? "block" : "none"} !important;
+          }
+          
+          .mobile-menu-btn {
+            display: flex !important;
+          }
+        }
+
+        @media (max-width: 768px) {
+          .patient-sidebar {
+            width: 320px !important;
+          }
+
+          .session-id-display {
+            display: none !important;
+          }
+
+          .doctor-name,
+          .doctor-spec {
+            max-width: 120px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+
+          .button-text {
+            display: inline;
+          }
+        }
+
+        @media (max-width: 640px) {
+          /* WhatsApp-style compact bubbles on mobile */
+          main > div:first-child > div > div {
+            padding-left: 8px !important;
+            padding-right: 8px !important;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .patient-sidebar {
+            width: 85vw !important;
+            max-width: 300px !important;
+          }
+
+          .helper-text {
+            display: none !important;
+          }
+
+          .button-text {
+            display: none !important;
+          }
+
+          header {
+            padding: 12px 16px !important;
+          }
+
+          header > div:first-of-type {
+            font-size: 16px !important;
+          }
+
+          header > div:first-of-type > div:last-child {
+            font-size: 11px !important;
+          }
+        }
+
+        @media (max-width: 380px) {
+          .patient-sidebar {
+            width: 90vw !important;
+          }
+        }
+
+        /* Smooth scrollbar */
+        .patient-sidebar::-webkit-scrollbar,
+        main > div:first-child::-webkit-scrollbar {
+          width: 6px;
+        }
+
+        .patient-sidebar::-webkit-scrollbar-track,
+        main > div:first-child::-webkit-scrollbar-track {
+          background: #f1f5f9;
+        }
+
+        .patient-sidebar::-webkit-scrollbar-thumb,
+        main > div:first-child::-webkit-scrollbar-thumb {
+          background: #cbd5e1;
+          border-radius: 3px;
+        }
+
+        .patient-sidebar::-webkit-scrollbar-thumb:hover,
+        main > div:first-child::-webkit-scrollbar-thumb:hover {
+          background: #94a3b8;
+        }
+
+        /* Loading animations */
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.5;
+          }
+        }
+
+        /* Focus visible for accessibility */
+        button:focus-visible {
+          outline: 2px solid #024e5a;
+          outline-offset: 2px;
+        }
+
+        textarea:focus-visible {
+          outline: 2px solid #024e5a;
+          outline-offset: 2px;
+        }
+      `}</style>
     </div>
   );
 };
 
-// helper for patient rows
+// Helper component for patient field rows
 const FieldRow = ({ label, value, multi = false }) => {
   if (!value) return null;
   return (
@@ -855,27 +1233,30 @@ const FieldRow = ({ label, value, multi = false }) => {
       style={{
         display: "flex",
         flexDirection: "column",
-        gap: 2,
-        padding: "6px 8px",
-        borderRadius: 8,
+        gap: "4px",
+        padding: "10px 12px",
+        borderRadius: "8px",
         background: "#f9fafb",
+        border: "1px solid #f3f4f6",
       }}
     >
       <span
         style={{
-          fontSize: 11,
+          fontSize: "10px",
           textTransform: "uppercase",
-          letterSpacing: 0.03,
+          letterSpacing: "0.5px",
           color: "#9ca3af",
+          fontWeight: "600",
         }}
       >
         {label}
       </span>
       <span
         style={{
-          fontSize: 13,
+          fontSize: "13px",
           color: "#111827",
           whiteSpace: multi ? "pre-wrap" : "normal",
+          lineHeight: "1.5",
         }}
       >
         {value}

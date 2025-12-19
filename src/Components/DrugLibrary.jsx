@@ -12,15 +12,16 @@ import { useToast } from "./ToastProvider";
 
 const DrugLibrary = () => {
   const dispatch = useDispatch();
-  const { loading, list = {} } = useSelector((state) => state.drugSafety);
-  const safeList = Array.isArray(list) ? list : list.data || [];
-
+  const { loading, list } = useSelector((state) => state.drugSafety);
+  const safeList = Array.isArray(list) ? list : [];
   const { success, error, warn, info, showConfirm } = useToast();
 
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     type: "interaction",
     drugName: "",
+    brandName: "", // ✅ NEW
+    form: "tablet", // ✅ NEW (default)
     stage: "",
     colorCode: "Red",
     category: "",
@@ -71,6 +72,8 @@ const DrugLibrary = () => {
     setFormData({
       type: item.type,
       drugName: item.drugName,
+      brandName: item.brandName || "", // ✅ NEW
+      form: item.form || "tablet", // ✅ NEW
       stage: item.stage || "",
       colorCode: item.colorCode,
       category: item.category,
@@ -164,6 +167,35 @@ const DrugLibrary = () => {
                   <option value="kidney">Kidney</option>
                   <option value="liver">Liver</option>
                   <option value="interaction">Interaction</option>
+                </select>
+              </div>
+              <div>
+                <label style={styles.label}>Brand Name</label>
+                <input
+                  name="brandName"
+                  placeholder="e.g. Glycomet, Crocin"
+                  value={formData.brandName}
+                  onChange={handleChange}
+                  style={styles.input}
+                  required
+                />
+              </div>
+
+              <div>
+                <label style={styles.label}>Drug Form</label>
+                <select
+                  name="form"
+                  value={formData.form}
+                  onChange={handleChange}
+                  style={styles.input}
+                  required
+                >
+                  <option value="tablet">Tablet</option>
+                  <option value="capsule">Capsule</option>
+                  <option value="syrup">Syrup</option>
+                  <option value="cream">Cream</option>
+                  <option value="injection">Injection</option>
+                  <option value="other">Other</option>
                 </select>
               </div>
 
@@ -301,15 +333,17 @@ const DrugLibrary = () => {
                 <th style={styles.th}>Category</th>
                 <th style={styles.th}>Remarks</th>
                 <th style={styles.th}>Advice</th>
+                <th style={styles.th}>Brand</th>
+                <th style={styles.th}>Form</th>
                 <th style={styles.th}>Actions</th>
               </tr>
             </thead>
 
             <tbody>
-              {list.length === 0 ? (
+              {safeList.length === 0 ? (
                 <tr>
                   <td
-                    colSpan="7"
+                    colSpan="9"
                     style={{ textAlign: "center", padding: "20px" }}
                   >
                     No drug safety rules found
@@ -317,6 +351,39 @@ const DrugLibrary = () => {
                 </tr>
               ) : (
                 safeList.map((item) => (
+                  // <tr key={item._id} style={styles.tr}>
+                  //   <td>
+                  //     <span
+                  //       style={{
+                  //         ...styles.badge,
+                  //         background: getColor(item.colorCode),
+                  //       }}
+                  //     >
+                  //       {item.colorCode}
+                  //     </span>
+                  //   </td>
+                  //   <td>{item.type}</td>
+                  //   <td>{item.drugName}</td>
+                  //   <td>{item.category}</td>
+                  //   <td>{item.remarks}</td>
+                  //   <td>{item.advice}</td>
+                  //   <td>{item.brandName}</td>
+                  //   <td style={{ textTransform: "capitalize" }}>{item.form}</td>
+                  //   <td style={styles.td}>
+                  //     <button
+                  //       style={styles.editBtn}
+                  //       onClick={() => handleEdit(item)}
+                  //     >
+                  //       Edit
+                  //     </button>
+                  //     <button
+                  //       style={styles.deleteBtn}
+                  //       onClick={() => handleDelete(item._id)}
+                  //     >
+                  //       Delete
+                  //     </button>
+                  //   </td>
+                  // </tr>
                   <tr key={item._id} style={styles.tr}>
                     <td>
                       <span
@@ -328,11 +395,18 @@ const DrugLibrary = () => {
                         {item.colorCode}
                       </span>
                     </td>
+
                     <td>{item.type}</td>
                     <td>{item.drugName}</td>
-                    <td>{item.category}</td>
-                    <td>{item.remarks}</td>
-                    <td>{item.advice}</td>
+                    <td>{item.category || "—"}</td>
+                    <td>{item.remarks || "—"}</td>
+                    <td>{item.advice || "—"}</td>
+
+                    <td>{item.brandName || "—"}</td>
+                    <td style={{ textTransform: "capitalize" }}>
+                      {item.form || "—"}
+                    </td>
+
                     <td style={styles.td}>
                       <button
                         style={styles.editBtn}

@@ -133,10 +133,16 @@ const drugSafetySlice = createSlice({
         state.error = null;
         state.success = false;
       })
-      .addCase(createDrugSafety.fulfilled, (state) => {
+      .addCase(createDrugSafety.fulfilled, (state, action) => {
         state.loading = false;
         state.success = true;
+
+        // 🔥 directly push new item
+        if (action.payload?.data) {
+          state.list.unshift(action.payload.data);
+        }
       })
+
       .addCase(createDrugSafety.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
@@ -164,16 +170,17 @@ const drugSafetySlice = createSlice({
       .addCase(updateDrugSafety.fulfilled, (state, action) => {
         state.loading = false;
 
-        const updatedItem = action.payload;
+        const updatedItem = action.payload.data; // 🔥 FIX
 
         const index = state.list.findIndex(
           (item) => item._id === updatedItem._id
         );
 
         if (index !== -1) {
-          state.list[index] = updatedItem; // update row in table
+          state.list[index] = updatedItem;
         }
       })
+
       .addCase(updateDrugSafety.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
